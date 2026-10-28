@@ -1,0 +1,17 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+backend/media/
+backend/staticfiles/
+node_modules/
+dist/
+coverage/
+playwright-report/
+test-results/
+.DS_Store
+.claude/settings.local.json
+celerybeat-schedule*
