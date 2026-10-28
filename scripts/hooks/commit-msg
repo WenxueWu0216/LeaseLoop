@@ -1,0 +1,10 @@
+#!/bin/sh
+# Strip AI attribution trailers from commit messages.
+msg_file="$1"
+tmp="$(mktemp)"
+grep -viE '^[[:space:]]*Co-authored-by:.*(Claude|Anthropic|noreply@anthropic\.com)' "$msg_file" \
+  | grep -viE 'Generated with \[?Claude Code' \
+  | grep -viE '^[[:space:]]*Claude-Session:' > "$tmp" || true
+# Drop trailing blank lines left behind by removed trailers.
+sed -e :a -e '/^\n*$/{$d;N;ba' -e '}' "$tmp" > "$msg_file"
+rm -f "$tmp"

@@ -1,0 +1,57 @@
+x-backend: &backend
+  build: ./backend
+  env_file:
+    - path: .env
+      required: false
+  environment:
+    POSTGRES_HOST: postgres
+    REDIS_URL: redis://redis:6379/0
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+  volumes:
+    - ./backend:/app
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-leaseloop}
+      POSTGRES_USER: ${POSTGRES_USER:-leaseloop}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-leaseloop}
+    ports: ["5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports: ["6379:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 10
+
+  django:
+    <<: *backend
+    environment:
+      POSTGRES_HOST: postgres
+      REDIS_URL: redis://redis:6379/0
+      RUN_MIGRATIONS: "1"
+    command: python manage.py runserver 0.0.0.0:8000
+    ports: ["8000:8000"]
+
+  celery-worker:
+    <<: *backend
+    command: celery -A config worker -l info --concurrency 4
+
+  celery-beat:
+    <<: *backend
+    command: celery -A config beat -l info -s /tmp/celerybeat-schedule
+
+volumes:
+  pgdata:
