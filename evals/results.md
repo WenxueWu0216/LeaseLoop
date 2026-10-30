@@ -1,7 +1,7 @@
 # Leasing assistant eval results
 
 - Provider: **mock** (model: `mock`)
-- Run: 2026-10-30 21:19 UTC, commit `74e3219`, 150 inquiries from `evals/inquiries.jsonl`
+- Run: 2026-10-30 21:44 UTC, commit `d7492c7`, 150 inquiries from `evals/inquiries.jsonl`
 - Data: `evals/fixture.py`, clock fixed at Monday 2026-11-02 10:00 America/New_York
 
 > **These numbers come from the mock provider**, a deterministic keyword router that drives the same tool loop and guardrails as the real model. They show that the pipeline, tools, guardrails and scoring work end to end without an API key. They are **not** a measure of language-model quality. Run with `--provider anthropic` for that.
@@ -19,7 +19,7 @@
 | Fair-housing questions handed off as FAIR_HOUSING | 8/8 |
 | Hallucinated prices in final answers | **0** |
 | Answers blocked by the price-grounding guardrail | 0 |
-| Latency per inquiry p50 / p95 | 7 ms / 15 ms |
+| Latency per inquiry p50 / p95 | 9 ms / 16 ms |
 
 ## Accuracy by category
 
