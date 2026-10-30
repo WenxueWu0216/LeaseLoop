@@ -194,11 +194,12 @@ class ProspectListSerializer(serializers.ModelSerializer):
 
     @extend_schema_field(TourSummarySerializer(allow_null=True))
     def get_next_tour(self, prospect):
-        tour = (
-            prospect.tours.filter(status=models.Tour.Status.SCHEDULED, start__gte=timezone.now())
-            .order_by("start")
-            .first()
-        )
+        upcoming = getattr(prospect, "upcoming_tours", None)
+        if upcoming is None:  # not prefetched (e.g. serializer used outside the viewset)
+            upcoming = prospect.tours.filter(
+                status=models.Tour.Status.SCHEDULED, start__gte=timezone.now()
+            ).order_by("start")[:1]
+        tour = next(iter(upcoming), None)
         return TourSummarySerializer(tour).data if tour else None
 
 

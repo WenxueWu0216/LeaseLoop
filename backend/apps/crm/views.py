@@ -1,3 +1,5 @@
+from django.db.models import Prefetch
+from django.utils import timezone
 from rest_framework import mixins, viewsets
 
 from apps.core.viewsets import OrgScopedModelViewSet, OrgScopedViewSetMixin
@@ -11,6 +13,29 @@ class ProspectViewSet(OrgScopedModelViewSet):
     serializer_class = serializers.ProspectSerializer
     filterset_class = filters.ProspectFilter
     ordering_fields = ["created_at", "last_contacted_at"]
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        if self.action in ("list", "retrieve"):
+            # One JOIN for the FKs and one IN-query for upcoming tours, instead of
+            # three lookups per row in the serializer.
+            upcoming = (
+                models.Tour.objects.filter(
+                    status=models.Tour.Status.SCHEDULED, start__gte=timezone.now()
+                )
+                .select_related("unit")
+                .order_by("start")
+            )
+            qs = qs.select_related("assigned_agent", "interested_property").prefetch_related(
+                Prefetch("tours", queryset=upcoming, to_attr="upcoming_tours")
+            )
+        if self.action == "retrieve":
+            qs = qs.prefetch_related(
+                Prefetch("tours", queryset=models.Tour.objects.select_related("unit")),
+                "conversations",
+                "applications",
+            )
+        return qs
 
     def get_serializer_class(self):
         if self.action == "list":
