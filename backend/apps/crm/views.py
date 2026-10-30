@@ -1,11 +1,17 @@
+from datetime import timedelta
+
+from django.db import transaction
 from django.db.models import Count, OuterRef, Prefetch, Q, Subquery
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema
 from rest_framework import mixins, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
+from apps.core.permissions import IsManager
 from apps.core.viewsets import OrgScopedModelViewSet, OrgScopedViewSetMixin
+from apps.properties.models import Unit
 
 from . import filters, models, serializers
 from .scoping import prospect_visibility, tour_visibility
@@ -37,6 +43,7 @@ class ProspectViewSet(OrgScopedModelViewSet):
                 Prefetch("tours", queryset=models.Tour.objects.select_related("unit")),
                 "conversations",
                 "applications",
+                "leases",
             )
         return qs
 
@@ -61,6 +68,14 @@ class TourViewSet(OrgScopedModelViewSet):
 
     def scope_for_agent(self, qs):
         return qs.filter(tour_visibility(self.request.user))
+
+    def perform_create(self, serializer):
+        tour = serializer.save(organization=self.organization)
+        # Same pipeline step as an assistant-booked tour.
+        models.Prospect.objects.filter(
+            pk=tour.prospect_id,
+            status__in=[models.Prospect.Status.NEW, models.Prospect.Status.CONTACTED],
+        ).update(status=models.Prospect.Status.TOUR_SCHEDULED)
 
 
 class ProspectChildMixin:
@@ -124,8 +139,6 @@ class ConversationViewSet(
 
 
 def send_agent_reply(conv, user, body: str) -> models.Message:
-    from django.utils import timezone
-
     from apps.integrations.outbound import OutboundRequest, get_backend
 
     now = timezone.now()
@@ -159,11 +172,96 @@ class ApplicationViewSet(ProspectChildMixin, OrgScopedModelViewSet):
     serializer_class = serializers.ApplicationSerializer
     filterset_class = filters.ApplicationFilter
 
+    def _transition(self, app, allowed_from, to, prospect_status=None, **fields):
+        if app.status not in allowed_from:
+            raise ValidationError(
+                {"status": f"Can't move a {app.status.lower()} application " f"to {to.lower()}."}
+            )
+        app.status = to
+        for k, v in fields.items():
+            setattr(app, k, v)
+        app.save()
+        if prospect_status:
+            models.Prospect.objects.filter(pk=app.prospect_id).update(status=prospect_status)
+        return Response(
+            serializers.ApplicationSerializer(app, context=self.get_serializer_context()).data
+        )
+
+    @extend_schema(request=None, responses=serializers.ApplicationSerializer)
+    @action(detail=True, methods=["post"])
+    def submit(self, request, pk=None):
+        return self._transition(
+            self.get_object(),
+            {models.Application.Status.DRAFT},
+            models.Application.Status.SUBMITTED,
+            models.Prospect.Status.APPLIED,
+            submitted_at=timezone.now(),
+        )
+
+    @extend_schema(request=None, responses=serializers.ApplicationSerializer)
+    @action(detail=True, methods=["post"], permission_classes=[IsManager])
+    def approve(self, request, pk=None):
+        app = self.get_object()
+        return self._transition(
+            app,
+            {models.Application.Status.SUBMITTED, models.Application.Status.SCREENING},
+            models.Application.Status.APPROVED,
+            models.Prospect.Status.APPROVED,
+            decided_at=timezone.now(),
+        )
+
+    @extend_schema(request=serializers.CreateLeaseSerializer, responses=serializers.LeaseSerializer)
+    @action(detail=True, methods=["post"], url_path="lease")
+    def create_lease(self, request, pk=None):
+        app = self.get_object()
+        if app.status != models.Application.Status.APPROVED:
+            raise ValidationError({"status": "Only approved applications can become leases."})
+        if models.Lease.objects.filter(application=app).exists():
+            raise ValidationError({"application": "This application already has a lease."})
+        data = serializers.CreateLeaseSerializer(data=request.data)
+        data.is_valid(raise_exception=True)
+        start = data.validated_data["start_date"]
+        months = data.validated_data["term_months"]
+        lease = models.Lease.objects.create(
+            organization_id=app.organization_id,
+            application=app,
+            prospect=app.prospect,
+            unit=app.unit,
+            start_date=start,
+            term_months=months,
+            end_date=start + timedelta(days=round(months * 30.44)),
+            monthly_rent=app.unit.rent,
+        )
+        return Response(
+            serializers.LeaseSerializer(lease, context=self.get_serializer_context()).data,
+            status=201,
+        )
+
 
 class LeaseViewSet(ProspectChildMixin, OrgScopedModelViewSet):
     queryset = models.Lease.objects.order_by("-created_at")
     serializer_class = serializers.LeaseSerializer
     filterset_class = filters.LeaseFilter
+
+    @extend_schema(request=None, responses=serializers.LeaseSerializer)
+    @action(detail=True, methods=["post"])
+    def sign(self, request, pk=None):
+        lease = self.get_object()
+        if lease.status not in (models.Lease.Status.DRAFT, models.Lease.Status.SENT):
+            raise ValidationError({"status": "This lease is already signed."})
+        with transaction.atomic():
+            lease.status = models.Lease.Status.SIGNED
+            lease.signed_at = timezone.now()
+            lease.save(update_fields=["status", "signed_at", "updated_at"])
+            models.Prospect.objects.filter(pk=lease.prospect_id).update(
+                status=models.Prospect.Status.LEASED
+            )
+            Unit.objects.filter(pk=lease.unit_id).update(
+                status=Unit.Status.OCCUPIED, available_from=None
+            )
+        return Response(
+            serializers.LeaseSerializer(lease, context=self.get_serializer_context()).data
+        )
 
 
 class RenewalViewSet(OrgScopedModelViewSet):

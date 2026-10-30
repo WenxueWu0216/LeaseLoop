@@ -27,11 +27,21 @@ export type ProspectRow = {
   next_tour: TourSummary | null;
 };
 
+export type Application = {
+  id: number; prospect: number; unit: number; status: "DRAFT" | "SUBMITTED" | "SCREENING" | "APPROVED" | "DENIED" | "WITHDRAWN";
+  submitted_at: string | null; decided_at: string | null;
+};
+export type Lease = {
+  id: number; application: number | null; unit: number; status: "DRAFT" | "SENT" | "SIGNED" | "ACTIVE" | "ENDED";
+  start_date: string; end_date: string; term_months: number; monthly_rent: string; signed_at: string | null;
+};
+
 export type ProspectDetail = ProspectRow & {
   notes: string;
   tours: TourSummary[];
   conversations: { id: number; channel: string; last_message_at: string | null; needs_handoff: boolean }[];
-  applications: { id: number; status: string; unit: number; submitted_at: string | null }[];
+  applications: Application[];
+  leases: Lease[];
 };
 
 export type InboxRow = {

@@ -43,6 +43,7 @@ def test_prospect_detail_query_count(manager_client, org, agent, django_assert_n
     make_prospects(org, agent, 1)
     prospect_id = manager_client.get("/api/prospects/").data["results"][0]["id"]
     # membership + prospect(+FK joins) + upcoming tours + tours + conversations + applications
-    with django_assert_num_queries(6):
+    # + leases
+    with django_assert_num_queries(7):
         resp = manager_client.get(f"/api/prospects/{prospect_id}/")
     assert resp.data["next_tour"] and len(resp.data["tours"]) == 1

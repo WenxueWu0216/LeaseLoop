@@ -179,6 +179,11 @@ class ApplicationSerializer(serializers.ModelSerializer):
         read_only_fields = ["submitted_at", "decided_at", "created_at", "updated_at"]
 
 
+class CreateLeaseSerializer(serializers.Serializer):
+    start_date = serializers.DateField()
+    term_months = serializers.IntegerField(min_value=6, max_value=15)
+
+
 class LeaseSerializer(serializers.ModelSerializer):
     prospect = VisibleProspectField(queryset=models.Prospect.objects.all())
     unit = OrgScopedPrimaryKeyRelatedField(queryset=Unit.objects.all())
@@ -281,6 +286,7 @@ class ProspectDetailSerializer(ProspectListSerializer):
     tours = TourSummarySerializer(many=True, read_only=True)
     conversations = ConversationSerializer(many=True, read_only=True)
     applications = ApplicationSerializer(many=True, read_only=True)
+    leases = LeaseSerializer(many=True, read_only=True)
 
     class Meta(ProspectListSerializer.Meta):
         fields = [
@@ -291,4 +297,5 @@ class ProspectDetailSerializer(ProspectListSerializer):
             "tours",
             "conversations",
             "applications",
+            "leases",
         ]

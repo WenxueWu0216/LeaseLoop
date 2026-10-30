@@ -2,8 +2,8 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tansta
 
 import { api, query } from "./client";
 import type {
-  InboxRow, Me, Message, Paginated, Property, ProspectDetail, ProspectRow, ProspectStatus,
-  Suggestion, Tour, Unit,
+  Application, InboxRow, Lease, Me, Message, Paginated, Property, ProspectDetail, ProspectRow,
+  ProspectStatus, Suggestion, Tour, Unit,
 } from "./types";
 
 export const useMe = (enabled: boolean) =>
@@ -124,3 +124,42 @@ export const useUnits = (property?: number) =>
       }
     },
   });
+
+/** Pipeline actions on a prospect's detail page; each refreshes the prospect afterwards. */
+export function usePipeline(prospectId: number) {
+  const qc = useQueryClient();
+  const refresh = () => {
+    qc.invalidateQueries({ queryKey: ["prospect", prospectId] });
+    qc.invalidateQueries({ queryKey: ["prospects"] });
+    qc.invalidateQueries({ queryKey: ["tours"] });
+    qc.invalidateQueries({ queryKey: ["units"] }); // a signed lease takes the unit off the market
+  };
+  return {
+    scheduleTour: useMutation({
+      mutationFn: (v: { unit: number; start: string; end: string }) =>
+        api<Tour>("/tours/", { method: "POST", json: { prospect: prospectId, ...v } }),
+      onSuccess: refresh,
+    }),
+    startApplication: useMutation({
+      mutationFn: (unit: number) =>
+        api<Application>("/applications/", { method: "POST", json: { prospect: prospectId, unit } }),
+      onSuccess: refresh,
+    }),
+    applicationAction: useMutation({
+      mutationFn: (v: { id: number; action: "submit" | "approve" }) =>
+        api<Application>(`/applications/${v.id}/${v.action}/`, { method: "POST" }),
+      onSuccess: refresh,
+    }),
+    createLease: useMutation({
+      mutationFn: (v: { application: number; start_date: string; term_months: number }) =>
+        api<Lease>(`/applications/${v.application}/lease/`, {
+          method: "POST", json: { start_date: v.start_date, term_months: v.term_months },
+        }),
+      onSuccess: refresh,
+    }),
+    signLease: useMutation({
+      mutationFn: (leaseId: number) => api<Lease>(`/leases/${leaseId}/sign/`, { method: "POST" }),
+      onSuccess: refresh,
+    }),
+  };
+}

@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { useProspect, useUpdateProspect } from "../api/hooks";
 import type { ProspectStatus } from "../api/types";
 import { Badge, humanize } from "../components/Badge";
+import { PipelineActions } from "../features/pipeline/PipelineActions";
 
 const STATUSES: ProspectStatus[] = ["NEW", "CONTACTED", "TOUR_SCHEDULED", "TOURED", "APPLIED", "APPROVED", "LEASED", "LOST"];
 
@@ -40,7 +41,9 @@ export function ProspectDetailPage() {
         <div><div className="text-slate-500">Last contact</div>{p.last_contacted_at ? new Date(p.last_contacted_at).toLocaleDateString() : "—"}</div>
       </section>
 
-      <section className="rounded-lg border bg-white p-4">
+      <PipelineActions prospect={p} />
+
+      <section className="rounded-lg border bg-white p-4" aria-label="Tours">
         <h2 className="mb-2 font-medium">Tours</h2>
         {p.tours.length === 0 ? <p className="text-sm text-slate-500">No tours yet.</p> : (
           <ul className="space-y-1 text-sm">
@@ -63,14 +66,6 @@ export function ProspectDetailPage() {
         </ul>
       </section>
 
-      <section className="rounded-lg border bg-white p-4">
-        <h2 className="mb-2 font-medium">Applications</h2>
-        {p.applications.length === 0 ? <p className="text-sm text-slate-500">None.</p> : (
-          <ul className="space-y-1 text-sm">
-            {p.applications.map((a) => <li key={a.id}>Unit {a.unit} · <Badge tone="green">{humanize(a.status)}</Badge></li>)}
-          </ul>
-        )}
-      </section>
     </div>
   );
 }
