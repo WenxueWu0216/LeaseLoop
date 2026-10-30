@@ -118,6 +118,7 @@ class Command(BaseCommand):
         parser.add_argument("--units-per-property", type=int, default=120)
         parser.add_argument("--agents-per-org", type=int, default=8)
         parser.add_argument("--seed", type=int, default=42)
+        parser.add_argument("--days", type=int, default=365, help="spread created_at over N days")
         parser.add_argument("--reset", action="store_true", help="Delete existing demo orgs first")
 
     def handle(self, *args, **opts):
@@ -243,7 +244,7 @@ class Command(BaseCommand):
         for _ in range(prospect_count):
             first, last = rng.choice(first_names), rng.choice(last_names)
             status = weighted(rng, STATUS_WEIGHTS)
-            created = now - timedelta(seconds=rng.randint(0, 365 * 86400))
+            created = now - timedelta(seconds=rng.randint(0, opts["days"] * 86400))
             prospects.append(
                 Prospect(
                     organization=org,
@@ -259,7 +260,7 @@ class Command(BaseCommand):
                     beds_min=rng.choice([0, 1, 1, 2, 2, 3]),
                     budget_max=Decimal(rng.randrange(1400, 4200, 50)),
                     has_pets=rng.random() < 0.35,
-                    last_contacted_at=created + timedelta(hours=rng.randint(1, 72))
+                    last_contacted_at=min(created + timedelta(hours=rng.randint(1, 72)), now)
                     if status != Prospect.Status.NEW
                     else None,
                     created_at=created,
@@ -305,7 +306,7 @@ class Command(BaseCommand):
                         direction="IN" if inbound else "OUT",
                         channel=conv.channel,
                         body=body,
-                        sent_at=t,
+                        sent_at=min(t, now),
                         sender=None if inbound else p.assigned_agent,
                     )
                 )
@@ -351,7 +352,7 @@ class Command(BaseCommand):
                             p.status, Application.Status.APPROVED
                         ),
                         monthly_income=Decimal(rng.randrange(4000, 15000, 100)),
-                        submitted_at=p.created_at + timedelta(days=12),
+                        submitted_at=min(p.created_at + timedelta(days=12), now),
                     )
                 )
 
@@ -374,7 +375,7 @@ class Command(BaseCommand):
                     end_date=start + timedelta(days=365),
                     term_months=12,
                     monthly_rent=app.unit.rent,
-                    signed_at=app.submitted_at + timedelta(days=15),
+                    signed_at=min(app.submitted_at + timedelta(days=15), now),
                 )
             )
         Lease.objects.bulk_create(leases, batch_size=BATCH)
