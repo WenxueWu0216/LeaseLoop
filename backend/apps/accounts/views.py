@@ -1,3 +1,4 @@
+from drf_spectacular.utils import extend_schema
 from rest_framework import mixins, viewsets
 from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.decorators import api_view, permission_classes
@@ -15,6 +16,7 @@ class LoginView(ObtainAuthToken):
     """POST {username: email, password} → {token}."""
 
 
+@extend_schema(responses=MeSerializer)
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def me(request):

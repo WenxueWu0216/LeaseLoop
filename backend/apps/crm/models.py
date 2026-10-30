@@ -61,6 +61,7 @@ class Prospect(OrgOwnedModel):
     notes = models.TextField(blank=True)
     last_contacted_at = models.DateTimeField(null=True, blank=True)
     last_followup_at = models.DateTimeField(null=True, blank=True)
+    followup_count = models.PositiveSmallIntegerField(default=0)
 
     class Meta:
         constraints = [
@@ -281,6 +282,8 @@ class HandoffTask(OrgOwnedModel):
         FAIR_HOUSING = "FAIR_HOUSING", "Fair-housing sensitive"
         MODEL_UNSURE = "MODEL_UNSURE", "Model unsure"
         REQUESTED_HUMAN = "REQUESTED_HUMAN", "Renter asked for a human"
+        UNGROUNDED = "UNGROUNDED", "Answer failed grounding check"
+        ASSISTANT_ERROR = "ASSISTANT_ERROR", "Assistant unavailable"
 
     class Status(models.TextChoices):
         OPEN = "OPEN", "Open"
