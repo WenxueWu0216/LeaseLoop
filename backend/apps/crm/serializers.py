@@ -71,7 +71,36 @@ class TourSerializer(AgentAssignmentMixin, serializers.ModelSerializer):
         end = attrs.get("end", getattr(self.instance, "end", None))
         if start and end and end <= start:
             raise serializers.ValidationError({"end": "Tour must end after it starts."})
+        unit = attrs.get("unit", getattr(self.instance, "unit", None))
+        status = attrs.get("status", getattr(self.instance, "status", models.Tour.Status.SCHEDULED))
+        if unit and start and end and status == models.Tour.Status.SCHEDULED:
+            clash = models.Tour.objects.filter(
+                unit=unit, status=models.Tour.Status.SCHEDULED, start__lt=end, end__gt=start
+            )
+            if self.instance is not None:
+                clash = clash.exclude(pk=self.instance.pk)
+            if clash.exists():
+                raise serializers.ValidationError(
+                    {"start": "Another tour of this unit overlaps that time."}
+                )
         return attrs
+
+
+class TourCalendarSerializer(TourSerializer):
+    """Tour row for the calendar: ids for writes plus display names (joined, no N+1)."""
+
+    prospect_name = serializers.CharField(source="prospect.full_name", read_only=True)
+    unit_number = serializers.CharField(source="unit.number", read_only=True)
+    property_id = serializers.IntegerField(source="unit.property_id", read_only=True)
+    property_name = serializers.CharField(source="unit.property.name", read_only=True)
+    timezone = serializers.CharField(source="unit.property.timezone", read_only=True)
+    agent_name = serializers.SerializerMethodField()
+
+    class Meta(TourSerializer.Meta):
+        pass
+
+    def get_agent_name(self, tour) -> str | None:
+        return tour.agent.get_full_name() if tour.agent else None
 
 
 class MessageSerializer(serializers.ModelSerializer):
@@ -88,6 +117,49 @@ class MessageSerializer(serializers.ModelSerializer):
             "sent_at",
         ]
         read_only_fields = fields
+
+
+class ProspectMiniSerializer(serializers.ModelSerializer):
+    name = serializers.CharField(source="full_name", read_only=True)
+
+    class Meta:
+        model = models.Prospect
+        fields = ["id", "name", "email", "phone", "status", "assigned_agent"]
+
+
+class InboxConversationSerializer(serializers.ModelSerializer):
+    """Inbox row. Last message and open handoffs come from queryset annotations."""
+
+    prospect = ProspectMiniSerializer(read_only=True)
+    last_message = serializers.SerializerMethodField()
+    open_handoffs = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = models.Conversation
+        fields = [
+            "id",
+            "channel",
+            "subject",
+            "last_message_at",
+            "is_unread",
+            "needs_handoff",
+            "prospect",
+            "last_message",
+            "open_handoffs",
+        ]
+
+    def get_last_message(self, conv) -> dict | None:
+        if conv.last_body is None:
+            return None
+        return {
+            "body": conv.last_body[:160],
+            "direction": conv.last_direction,
+            "is_assistant": conv.last_is_assistant,
+        }
+
+
+class ReplySerializer(serializers.Serializer):
+    body = serializers.CharField(max_length=2000)
 
 
 class ConversationSerializer(serializers.ModelSerializer):
@@ -130,6 +202,8 @@ class RenewalSerializer(serializers.ModelSerializer):
 
 
 class HandoffTaskSerializer(serializers.ModelSerializer):
+    prospect_name = serializers.CharField(source="prospect.full_name", read_only=True)
+
     class Meta:
         model = models.HandoffTask
         exclude = ["organization"]

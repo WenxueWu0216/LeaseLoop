@@ -1,4 +1,4 @@
-from django.db.models import Prefetch
+from django.db.models import Count, OuterRef, Prefetch, Q, Subquery
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema
 from rest_framework import mixins, viewsets
@@ -52,8 +52,10 @@ class ProspectViewSet(OrgScopedModelViewSet):
 
 
 class TourViewSet(OrgScopedModelViewSet):
-    queryset = models.Tour.objects.order_by("start")
-    serializer_class = serializers.TourSerializer
+    queryset = models.Tour.objects.select_related("prospect", "unit__property", "agent").order_by(
+        "start"
+    )
+    serializer_class = serializers.TourCalendarSerializer
     filterset_class = filters.TourFilter
     ordering_fields = ["start"]
 
@@ -76,9 +78,42 @@ class ConversationViewSet(
     mixins.UpdateModelMixin,
     viewsets.GenericViewSet,
 ):
-    queryset = models.Conversation.objects.order_by("-last_message_at")
+    queryset = models.Conversation.objects.order_by("-last_message_at", "-id")
     serializer_class = serializers.ConversationSerializer
     filterset_class = filters.ConversationFilter
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        if self.action == "list":
+            last = models.Message.objects.filter(conversation=OuterRef("pk")).order_by("-sent_at")
+            qs = qs.select_related("prospect").annotate(
+                last_body=Subquery(last.values("body")[:1]),
+                last_direction=Subquery(last.values("direction")[:1]),
+                last_is_assistant=Subquery(last.values("is_assistant")[:1]),
+                open_handoffs=Count(
+                    "handoffs", filter=Q(handoffs__status=models.HandoffTask.Status.OPEN)
+                ),
+            )
+        return qs
+
+    def get_serializer_class(self):
+        if self.action == "list":
+            return serializers.InboxConversationSerializer
+        return serializers.ConversationSerializer
+
+    @extend_schema(
+        request=serializers.ReplySerializer, responses=serializers.MessageSerializer(many=True)
+    )
+    @action(detail=True, methods=["get", "post"])
+    def messages(self, request, pk=None):
+        """GET the thread (oldest first); POST an agent reply on the conversation's channel."""
+        conv = self.get_object()
+        if request.method == "POST":
+            data = serializers.ReplySerializer(data=request.data)
+            data.is_valid(raise_exception=True)
+            send_agent_reply(conv, request.user, data.validated_data["body"])
+        thread = conv.messages.order_by("sent_at", "id")[:500]
+        return Response(serializers.MessageSerializer(thread, many=True).data)
 
     @extend_schema(request=None, responses={200: dict})
     @action(detail=True, methods=["post"], url_path="suggest-reply")
@@ -86,6 +121,37 @@ class ConversationViewSet(
         from apps.assistant.views import suggest_reply
 
         return Response(suggest_reply(self.get_object()))
+
+
+def send_agent_reply(conv, user, body: str) -> models.Message:
+    from django.utils import timezone
+
+    from apps.integrations.outbound import OutboundRequest, get_backend
+
+    now = timezone.now()
+    prospect = conv.prospect
+    to = prospect.phone if conv.channel == models.Channel.SMS else prospect.email
+    message = models.Message.objects.create(
+        organization_id=conv.organization_id,
+        conversation=conv,
+        direction=models.Message.Direction.OUTBOUND,
+        channel=conv.channel,
+        body=body,
+        sender=user,
+        sent_at=now,
+    )
+    if conv.channel != models.Channel.CHAT and to:
+        get_backend().send(
+            OutboundRequest(
+                to=to, channel=conv.channel, body=body, idempotency_key=f"message:{message.pk}"
+            )
+        )
+    models.Conversation.objects.filter(pk=conv.pk).update(last_message_at=now, is_unread=False)
+    updates = {"last_contacted_at": now}
+    if prospect.status == models.Prospect.Status.NEW:
+        updates["status"] = models.Prospect.Status.CONTACTED
+    models.Prospect.objects.filter(pk=prospect.pk).update(**updates)
+    return message
 
 
 class ApplicationViewSet(ProspectChildMixin, OrgScopedModelViewSet):
@@ -116,6 +182,6 @@ class HandoffTaskViewSet(
     mixins.UpdateModelMixin,
     viewsets.GenericViewSet,
 ):
-    queryset = models.HandoffTask.objects.order_by("-created_at")
+    queryset = models.HandoffTask.objects.select_related("prospect").order_by("-created_at")
     serializer_class = serializers.HandoffTaskSerializer
     filterset_class = filters.HandoffFilter

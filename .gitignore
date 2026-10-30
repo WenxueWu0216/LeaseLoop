@@ -16,3 +16,4 @@ test-results/
 .claude/settings.local.json
 celerybeat-schedule*
 dump.rdb
+*.tsbuildinfo

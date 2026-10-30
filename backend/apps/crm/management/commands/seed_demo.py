@@ -5,6 +5,7 @@ from datetime import timedelta
 from decimal import Decimal
 
 from django.contrib.auth.hashers import make_password
+from django.core.management import call_command
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.utils import timezone
@@ -148,6 +149,8 @@ class Command(BaseCommand):
         for i in range(n_orgs):
             with transaction.atomic():
                 self._seed_org(i + 1, per_org[i], opts, rng, fake, first_names, last_names, now)
+        # bulk_create skips the reindex signal, so embed the demo policies explicitly.
+        call_command("index_policies", stdout=self.stdout)
         self.stdout.write(
             self.style.SUCCESS(
                 f"Seeded {opts['prospects']} prospects in {time.perf_counter() - started:.1f}s. "

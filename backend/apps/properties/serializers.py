@@ -13,6 +13,7 @@ class PropertySerializer(serializers.ModelSerializer):
 
 class UnitSerializer(serializers.ModelSerializer):
     property = OrgScopedPrimaryKeyRelatedField(queryset=Property.objects.all())
+    property_name = serializers.CharField(source="property.name", read_only=True)
 
     class Meta:
         model = Unit

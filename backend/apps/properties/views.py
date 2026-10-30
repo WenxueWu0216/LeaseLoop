@@ -13,7 +13,7 @@ class PropertyViewSet(OrgScopedModelViewSet):
 
 
 class UnitViewSet(OrgScopedModelViewSet):
-    queryset = Unit.objects.order_by("property_id", "number")
+    queryset = Unit.objects.select_related("property").order_by("property_id", "number")
     serializer_class = UnitSerializer
     filterset_class = UnitFilter
     ordering_fields = ["rent", "available_from", "beds"]
