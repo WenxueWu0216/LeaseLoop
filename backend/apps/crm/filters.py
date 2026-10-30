@@ -3,10 +3,14 @@ from django.db.models import Q
 
 from . import models
 
+# MultipleChoiceFilter defaults to distinct=True, which wraps the page query and the
+# paginator's COUNT in SELECT DISTINCT over every column. None of these filters join
+# to-many relations, so rows can't duplicate.
+
 
 class ProspectFilter(df.FilterSet):
-    status = df.MultipleChoiceFilter(choices=models.Prospect.Status.choices)
-    source = df.MultipleChoiceFilter(choices=models.Prospect.Source.choices)
+    status = df.MultipleChoiceFilter(choices=models.Prospect.Status.choices, distinct=False)
+    source = df.MultipleChoiceFilter(choices=models.Prospect.Source.choices, distinct=False)
     assigned_agent = df.NumberFilter(field_name="assigned_agent_id")
     unassigned = df.BooleanFilter(field_name="assigned_agent", lookup_expr="isnull")
     interested_property = df.NumberFilter(field_name="interested_property_id")
@@ -34,7 +38,7 @@ class ProspectFilter(df.FilterSet):
 class TourFilter(df.FilterSet):
     start_after = df.IsoDateTimeFilter(field_name="start", lookup_expr="gte")
     start_before = df.IsoDateTimeFilter(field_name="start", lookup_expr="lt")
-    status = df.MultipleChoiceFilter(choices=models.Tour.Status.choices)
+    status = df.MultipleChoiceFilter(choices=models.Tour.Status.choices, distinct=False)
     agent = df.NumberFilter(field_name="agent_id")
     unit = df.NumberFilter(field_name="unit_id")
     property = df.NumberFilter(field_name="unit__property_id")
@@ -57,7 +61,7 @@ class ConversationFilter(df.FilterSet):
 
 
 class ApplicationFilter(df.FilterSet):
-    status = df.MultipleChoiceFilter(choices=models.Application.Status.choices)
+    status = df.MultipleChoiceFilter(choices=models.Application.Status.choices, distinct=False)
     prospect = df.NumberFilter(field_name="prospect_id")
 
     class Meta:
@@ -66,7 +70,7 @@ class ApplicationFilter(df.FilterSet):
 
 
 class LeaseFilter(df.FilterSet):
-    status = df.MultipleChoiceFilter(choices=models.Lease.Status.choices)
+    status = df.MultipleChoiceFilter(choices=models.Lease.Status.choices, distinct=False)
     ends_before = df.DateFilter(field_name="end_date", lookup_expr="lt")
 
     class Meta:

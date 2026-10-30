@@ -5,7 +5,7 @@ from .models import PropertyPolicy, Unit
 
 class UnitFilter(df.FilterSet):
     property = df.NumberFilter(field_name="property_id")
-    status = df.MultipleChoiceFilter(choices=Unit.Status.choices)
+    status = df.MultipleChoiceFilter(choices=Unit.Status.choices, distinct=False)
     beds = df.NumberFilter()
     beds_min = df.NumberFilter(field_name="beds", lookup_expr="gte")
     rent_max = df.NumberFilter(field_name="rent", lookup_expr="lte")
