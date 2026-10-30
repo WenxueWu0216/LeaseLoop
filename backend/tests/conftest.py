@@ -49,3 +49,12 @@ def manager_client(api_for, manager):
 @pytest.fixture
 def agent_client(api_for, agent):
     return api_for(agent)
+
+
+@pytest.fixture
+def outbox():
+    from apps.integrations.outbound import LogBackend
+
+    LogBackend.sent.clear()
+    yield LogBackend.sent
+    LogBackend.sent.clear()

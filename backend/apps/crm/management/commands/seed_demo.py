@@ -188,10 +188,17 @@ class Command(BaseCommand):
                     city=fake.city(),
                     state=fake.state_abbr(),
                     zip_code=fake.zipcode(),
+                    # Deterministic routing keys used by the sample webhooks and ILS feed.
+                    inbound_email=f"leasing-{n}-{i}@inbound.leaseloop.dev",
+                    sms_number=f"+1555{n:03d}{i:04d}",
+                    ils_listing_id=f"LL-{n}-{i}",
                 )
-                for kind in rng.sample(
-                    ["Lofts", "Commons", "Residences", "Flats", "Place", "Terrace", "Gardens"],
-                    opts["properties_per_org"],
+                for i, kind in enumerate(
+                    rng.sample(
+                        ["Lofts", "Commons", "Residences", "Flats", "Place", "Terrace", "Gardens"],
+                        opts["properties_per_org"],
+                    ),
+                    start=1,
                 )
             ]
         )

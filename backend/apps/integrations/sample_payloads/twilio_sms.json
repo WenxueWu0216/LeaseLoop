@@ -1,0 +1,23 @@
+{
+  "_comment": "Form fields Twilio POSTs (application/x-www-form-urlencoded) for an inbound SMS.",
+  "ToCountry": "US",
+  "ToState": "NJ",
+  "SmsMessageSid": "SM2f3b1c9a7e6d5c4b3a2918f7e6d5c4b3",
+  "NumMedia": "0",
+  "ToCity": "",
+  "FromZip": "07030",
+  "SmsSid": "SM2f3b1c9a7e6d5c4b3a2918f7e6d5c4b3",
+  "FromState": "NJ",
+  "SmsStatus": "received",
+  "FromCity": "HOBOKEN",
+  "Body": "Hi, what's the rent on a 1 bed and is parking included?",
+  "FromCountry": "US",
+  "To": "+15550010001",
+  "MessagingServiceSid": "MGXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+  "ToZip": "",
+  "NumSegments": "1",
+  "MessageSid": "SM2f3b1c9a7e6d5c4b3a2918f7e6d5c4b3",
+  "AccountSid": "ACXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+  "From": "+12015550123",
+  "ApiVersion": "2010-04-01"
+}

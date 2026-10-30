@@ -61,6 +61,7 @@ class Prospect(OrgOwnedModel):
     notes = models.TextField(blank=True)
     last_contacted_at = models.DateTimeField(null=True, blank=True)
     last_followup_at = models.DateTimeField(null=True, blank=True)
+    followup_count = models.PositiveSmallIntegerField(default=0)
 
     class Meta:
         constraints = [
