@@ -54,7 +54,11 @@ def main():
 
     cases = [
         ("Prospect list (manager, page 1)", "/api/prospects/", manager),
-        ("Prospect list, status=CONTACTED", "/api/prospects/?status=CONTACTED", manager),
+        (
+            "Prospect list, status=CONTACTED",
+            "/api/prospects/?status=CONTACTED",
+            manager,
+        ),
         ("Prospect list (agent scope)", "/api/prospects/", agent),
         ("Prospect list, page 500", "/api/prospects/?page=500", manager),
         ("Prospect search q=smith", "/api/prospects/?q=smith", manager),
