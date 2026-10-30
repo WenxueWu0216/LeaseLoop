@@ -12,4 +12,9 @@ export default tseslint.config(
     plugins: { "react-hooks": reactHooks },
     rules: { ...reactHooks.configs.recommended.rules },
   },
+  {
+    files: ["src/**/*.test.{ts,tsx}", "src/test/**", "e2e/**"],
+    languageOptions: { globals: { ...globals.jest } },
+  },
+  { files: ["**/*.cjs"], languageOptions: { sourceType: "commonjs", globals: globals.node } },
 );

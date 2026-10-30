@@ -76,9 +76,9 @@ export function TourCalendar({ monday, tours, onReschedule }: Props) {
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr>
-              <th className="w-16" />
+              <th scope="col" className="w-16"><span className="sr-only">Time</span></th>
               {days.map((d) => (
-                <th key={d} className="border-b px-2 py-2 text-left font-medium text-slate-600">
+                <th key={d} scope="col" className="border-b px-2 py-2 text-left font-medium text-slate-600">
                   {new Date(`${d}T12:00:00Z`).toLocaleDateString("en-US", {
                     weekday: "short", month: "short", day: "numeric", timeZone: "UTC",
                   })}
@@ -89,7 +89,7 @@ export function TourCalendar({ monday, tours, onReschedule }: Props) {
           <tbody>
             {SLOTS.map((slot) => (
               <tr key={slot}>
-                <th className="pr-2 text-right align-top text-xs font-normal text-slate-400">
+                <th scope="row" className="pr-2 text-right align-top text-xs font-normal text-slate-400">
                   {formatTime(slot)}
                 </th>
                 {days.map((d) => {
