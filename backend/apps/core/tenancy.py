@@ -40,4 +40,8 @@ def resolve_membership(request: Request) -> Membership:
         membership = found[0]
 
     request._membership = membership
+    # Also expose it on the underlying HttpRequest so middleware can log the org.
+    raw = getattr(request, "_request", None)
+    if raw is not None:
+        raw._membership = membership
     return membership

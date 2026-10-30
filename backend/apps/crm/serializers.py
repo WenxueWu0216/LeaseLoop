@@ -1,3 +1,5 @@
+from django.utils import timezone
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from apps.accounts.models import User
@@ -139,4 +141,79 @@ class HandoffTaskSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
             "resolved_at",
+        ]
+
+
+class AgentSummarySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ["id", "first_name", "last_name", "email"]
+
+
+class PropertySummarySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Property
+        fields = ["id", "name"]
+
+
+class TourSummarySerializer(serializers.ModelSerializer):
+    unit_number = serializers.CharField(source="unit.number")
+
+    class Meta:
+        model = models.Tour
+        fields = ["id", "start", "end", "status", "unit", "unit_number"]
+
+
+class ProspectListSerializer(serializers.ModelSerializer):
+    """Row shape for the prospect pipeline table."""
+
+    assigned_agent = AgentSummarySerializer(read_only=True)
+    interested_property = PropertySummarySerializer(read_only=True)
+    next_tour = serializers.SerializerMethodField()
+
+    class Meta:
+        model = models.Prospect
+        fields = [
+            "id",
+            "first_name",
+            "last_name",
+            "email",
+            "phone",
+            "source",
+            "status",
+            "assigned_agent",
+            "interested_property",
+            "desired_move_in",
+            "beds_min",
+            "budget_max",
+            "has_pets",
+            "last_contacted_at",
+            "created_at",
+            "next_tour",
+        ]
+
+    @extend_schema_field(TourSummarySerializer(allow_null=True))
+    def get_next_tour(self, prospect):
+        tour = (
+            prospect.tours.filter(status=models.Tour.Status.SCHEDULED, start__gte=timezone.now())
+            .order_by("start")
+            .first()
+        )
+        return TourSummarySerializer(tour).data if tour else None
+
+
+class ProspectDetailSerializer(ProspectListSerializer):
+    tours = TourSummarySerializer(many=True, read_only=True)
+    conversations = ConversationSerializer(many=True, read_only=True)
+    applications = ApplicationSerializer(many=True, read_only=True)
+
+    class Meta(ProspectListSerializer.Meta):
+        fields = [
+            *ProspectListSerializer.Meta.fields,
+            "notes",
+            "external_id",
+            "updated_at",
+            "tours",
+            "conversations",
+            "applications",
         ]

@@ -35,6 +35,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    "apps.core.middleware.RequestMetricsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -102,7 +103,7 @@ REST_FRAMEWORK = {
         "rest_framework.filters.OrderingFilter",
         "rest_framework.filters.SearchFilter",
     ],
-    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "DEFAULT_PAGINATION_CLASS": "apps.core.pagination.StandardPagination",
     "PAGE_SIZE": 25,
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
 }
@@ -111,6 +112,15 @@ SPECTACULAR_SETTINGS = {
     "TITLE": "LeaseLoop API",
     "DESCRIPTION": "Multi-tenant apartment leasing CRM",
     "VERSION": "0.1.0",
+    "ENUM_NAME_OVERRIDES": {
+        "ProspectStatusEnum": "apps.crm.models.Prospect.Status",
+        "TourStatusEnum": "apps.crm.models.Tour.Status",
+        "ApplicationStatusEnum": "apps.crm.models.Application.Status",
+        "LeaseStatusEnum": "apps.crm.models.Lease.Status",
+        "RenewalStatusEnum": "apps.crm.models.Renewal.Status",
+        "HandoffStatusEnum": "apps.crm.models.HandoffTask.Status",
+        "UnitStatusEnum": "apps.properties.models.Unit.Status",
+    },
 }
 
 REDIS_URL = env("REDIS_URL", "redis://localhost:6379/0")
@@ -123,9 +133,21 @@ CELERY_TIMEZONE = TIME_ZONE
 ANTHROPIC_API_KEY = env("ANTHROPIC_API_KEY")
 LLM_PROVIDER = env("LLM_PROVIDER", "mock")
 
+# Requests slower than this, or with more queries than this, are logged at WARNING.
+SLOW_REQUEST_MS = int(env("SLOW_REQUEST_MS", "500"))
+MAX_QUERIES_PER_REQUEST = int(env("MAX_QUERIES_PER_REQUEST", "30"))
+
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
-    "handlers": {"console": {"class": "logging.StreamHandler"}},
+    "formatters": {"json": {"()": "apps.core.logging.JsonFormatter"}},
+    "handlers": {"console": {"class": "logging.StreamHandler", "formatter": "json"}},
     "root": {"handlers": ["console"], "level": env("LOG_LEVEL", "INFO")},
+    "loggers": {
+        "leaseloop.request": {
+            "handlers": ["console"],
+            "level": env("REQUEST_LOG_LEVEL", "INFO"),
+            "propagate": False,
+        },
+    },
 }
