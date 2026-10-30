@@ -282,6 +282,8 @@ class HandoffTask(OrgOwnedModel):
         FAIR_HOUSING = "FAIR_HOUSING", "Fair-housing sensitive"
         MODEL_UNSURE = "MODEL_UNSURE", "Model unsure"
         REQUESTED_HUMAN = "REQUESTED_HUMAN", "Renter asked for a human"
+        UNGROUNDED = "UNGROUNDED", "Answer failed grounding check"
+        ASSISTANT_ERROR = "ASSISTANT_ERROR", "Assistant unavailable"
 
     class Status(models.TextChoices):
         OPEN = "OPEN", "Open"

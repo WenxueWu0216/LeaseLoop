@@ -35,6 +35,7 @@ INSTALLED_APPS = [
     "apps.properties",
     "apps.crm",
     "apps.integrations",
+    "apps.assistant",
 ]
 
 MIDDLEWARE = [
@@ -109,6 +110,7 @@ REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS": "apps.core.pagination.StandardPagination",
     "PAGE_SIZE": 25,
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    "DEFAULT_THROTTLE_RATES": {"assistant_chat": env("ASSISTANT_CHAT_RATE", "30/min")},
 }
 
 SPECTACULAR_SETTINGS = {
@@ -161,7 +163,13 @@ FOLLOWUP_MAX = int(env("FOLLOWUP_MAX", "2"))
 FOLLOWUP_BATCH = int(env("FOLLOWUP_BATCH", "500"))
 
 ANTHROPIC_API_KEY = env("ANTHROPIC_API_KEY")
-LLM_PROVIDER = env("LLM_PROVIDER", "mock")
+LLM_PROVIDER = env("LLM_PROVIDER", "mock")  # mock | anthropic
+LLM_MODEL = env("LLM_MODEL", "claude-opus-5-5")
+LLM_EFFORT = env("LLM_EFFORT", "medium")
+# Below this cosine similarity, retrieval alone doesn't count as grounding (the answer
+# then needs a tool result or it is handed off). 0.20 sits above every unanswerable
+# question in evals/dev_questions.jsonl for the hashing embedder; see docs/assistant.md.
+ASSISTANT_MIN_RETRIEVAL_SCORE = float(env("ASSISTANT_MIN_RETRIEVAL_SCORE", "0.20"))
 
 # Requests slower than this, or with more queries than this, are logged at WARNING.
 SLOW_REQUEST_MS = int(env("SLOW_REQUEST_MS", "500"))

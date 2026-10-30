@@ -1,0 +1,12 @@
+{"question": "Can I have a hamster?", "answerable": false}
+{"question": "Do you have a dog park on site?", "answerable": false}
+{"question": "Is there a concierge?", "answerable": false}
+{"question": "Can I sublet my apartment?", "answerable": false}
+{"question": "Do apartments have balconies?", "answerable": false}
+{"question": "What is the closest train station?", "answerable": false}
+{"question": "Is there a monthly fee for trash pickup?", "answerable": true}
+{"question": "How long does the application decision take?", "answerable": true}
+{"question": "Do I need a cosigner if my income is low?", "answerable": true}
+{"question": "Is the gym open all night?", "answerable": true}
+{"question": "What are the office hours on Saturday?", "answerable": true}
+{"question": "Is a shorter lease more expensive?", "answerable": true}

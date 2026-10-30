@@ -1,9 +1,15 @@
+import sys
+from pathlib import Path
+
 import pytest
 from rest_framework.test import APIClient
 
 from apps.accounts.models import Membership
 
 from .factories import MembershipFactory, OrganizationFactory
+
+# Make the repo-level evals package (shared eval fixture) importable.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 
 @pytest.fixture
@@ -58,3 +64,10 @@ def outbox():
     LogBackend.sent.clear()
     yield LogBackend.sent
     LogBackend.sent.clear()
+
+
+@pytest.fixture
+def eval_data(db):
+    from evals import fixture
+
+    return fixture.build()

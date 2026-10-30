@@ -22,5 +22,6 @@ urlpatterns = [
     path("auth/login/", LoginView.as_view(), name="login"),
     path("auth/me/", me, name="me"),
     path("webhooks/", include("apps.integrations.urls")),
+    path("assistant/", include("apps.assistant.urls")),
     *router.urls,
 ]

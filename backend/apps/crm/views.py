@@ -1,6 +1,9 @@
 from django.db.models import Prefetch
 from django.utils import timezone
+from drf_spectacular.utils import extend_schema
 from rest_framework import mixins, viewsets
+from rest_framework.decorators import action
+from rest_framework.response import Response
 
 from apps.core.viewsets import OrgScopedModelViewSet, OrgScopedViewSetMixin
 
@@ -76,6 +79,13 @@ class ConversationViewSet(
     queryset = models.Conversation.objects.order_by("-last_message_at")
     serializer_class = serializers.ConversationSerializer
     filterset_class = filters.ConversationFilter
+
+    @extend_schema(request=None, responses={200: dict})
+    @action(detail=True, methods=["post"], url_path="suggest-reply")
+    def suggest_reply(self, request, pk=None):
+        from apps.assistant.views import suggest_reply
+
+        return Response(suggest_reply(self.get_object()))
 
 
 class ApplicationViewSet(ProspectChildMixin, OrgScopedModelViewSet):
