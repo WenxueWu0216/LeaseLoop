@@ -14,6 +14,22 @@ class ProspectViewSet(OrgScopedModelViewSet):
         # Agent, property, counts and next tour in the same query: no N+1.
         return super().get_queryset().with_list_data()
 
+    def list(self, request, *args, **kwargs):
+        """Paginate ids first, then annotate only the rows on the page.
+
+        With OFFSET, Postgres evaluates SELECT-list subqueries for every
+        skipped row: page 2000 ran the count subqueries 50,000 times.
+        ``values_list("pk")`` drops the unused annotations, so the OFFSET
+        scan is a plain index scan and the subqueries run 25 times.
+        """
+        queryset = self.filter_queryset(self.get_queryset())
+        page_ids = self.paginate_queryset(queryset.values_list("pk", flat=True))
+        if page_ids is None:
+            return super().list(request, *args, **kwargs)
+        rows = {p.pk: p for p in queryset.filter(pk__in=list(page_ids))}
+        serializer = self.get_serializer([rows[pk] for pk in page_ids], many=True)
+        return self.get_paginated_response(serializer.data)
+
     def scope_for_agent(self, qs):
         return qs.filter(prospect_visibility(self.request.user))
 

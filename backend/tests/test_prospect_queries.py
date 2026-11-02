@@ -10,7 +10,7 @@ from datetime import timedelta
 import pytest
 from django.utils import timezone
 
-from apps.crm.models import Application, Tour
+from apps.crm.models import Application, Prospect, Tour
 
 from .factories import (
     MembershipFactory,
@@ -23,8 +23,8 @@ from .query_count import count_queries
 
 pytestmark = pytest.mark.django_db
 
-# membership lookup + pagination COUNT(*) + the page itself
-EXPECTED_LIST_QUERIES = 3
+# membership lookup + pagination COUNT(*) + page ids + the annotated page rows
+EXPECTED_LIST_QUERIES = 4
 
 
 def add_prospects(org, n):
@@ -95,3 +95,18 @@ def test_create_response_includes_related_fields(org, manager_client):
     assert resp.data["interested_property_name"] == prop.name
     assert resp.data["tour_count"] == 0
     assert resp.data["next_tour_at"] is None
+
+
+def test_prospect_list_keeps_ordering_across_pages(org, manager_client):
+    add_prospects(org, 30)
+    first = manager_client.get("/api/prospects/").data
+    second = manager_client.get("/api/prospects/?page=2").data
+    ids = [r["id"] for r in first["results"] + second["results"]]
+    expected = list(
+        Prospect.objects.filter(organization=org)
+        .order_by("-created_at", "-id")
+        .values_list("id", flat=True)
+    )
+    assert first["count"] == 30
+    assert ids == expected
+    assert second["results"][0]["tour_count"] == 2
