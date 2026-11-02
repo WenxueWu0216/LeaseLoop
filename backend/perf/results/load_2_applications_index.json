@@ -1,0 +1,15 @@
+{
+  "prospect_count": 100000,
+  "endpoints": {
+    "applications_list": {
+      "requests": 2000,
+      "errors": 0,
+      "concurrency": 10,
+      "p50_ms": 36.4,
+      "p95_ms": 51.0,
+      "p99_ms": 61.5,
+      "mean_ms": 37.6,
+      "rps": 265.1
+    }
+  }
+}

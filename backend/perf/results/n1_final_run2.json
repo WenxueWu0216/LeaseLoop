@@ -1,0 +1,25 @@
+{
+  "dataset": {
+    "prospects": 200,
+    "tours": 411,
+    "applications": 176,
+    "conversations": 200
+  },
+  "url": "/api/prospects/",
+  "naive": {
+    "rows_on_page": 25,
+    "queries": 124,
+    "median_ms": 114.17,
+    "min_ms": 101.03,
+    "max_ms": 144.09,
+    "runs": 20
+  },
+  "optimized": {
+    "rows_on_page": 25,
+    "queries": 4,
+    "median_ms": 16.07,
+    "min_ms": 13.01,
+    "max_ms": 20.54,
+    "runs": 20
+  }
+}

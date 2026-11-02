@@ -1,0 +1,5 @@
+Limit  (cost=0.42..1.97 rows=25 width=81) (actual time=0.055..0.064 rows=25 loops=1)
+  ->  Index Scan using application_org_created on crm_application  (cost=0.42..4967.15 rows=80092 width=81) (actual time=0.053..0.061 rows=25 loops=1)
+        Index Cond: (organization_id = 1)
+Planning Time: 0.581 ms
+Execution Time: 0.084 ms

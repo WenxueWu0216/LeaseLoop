@@ -1,0 +1,85 @@
+{
+  "prospect_count": 100000,
+  "endpoints": {
+    "prospects_list": {
+      "requests": 2000,
+      "errors": 0,
+      "concurrency": 10,
+      "p50_ms": 69.7,
+      "p95_ms": 91.6,
+      "p99_ms": 106.1,
+      "mean_ms": 71.2,
+      "rps": 140.1
+    },
+    "prospects_list_page_2_to_50": {
+      "requests": 2000,
+      "errors": 0,
+      "concurrency": 10,
+      "p50_ms": 86.5,
+      "p95_ms": 119.4,
+      "p99_ms": 143.7,
+      "mean_ms": 88.5,
+      "rps": 112.7
+    },
+    "prospects_list_deep_page": {
+      "requests": 2000,
+      "errors": 0,
+      "concurrency": 10,
+      "p50_ms": 2991.4,
+      "p95_ms": 3627.2,
+      "p99_ms": 4007.0,
+      "mean_ms": 3014.7,
+      "rps": 3.3
+    },
+    "prospect_detail": {
+      "requests": 2000,
+      "errors": 0,
+      "concurrency": 10,
+      "p50_ms": 27.1,
+      "p95_ms": 39.1,
+      "p99_ms": 48.7,
+      "mean_ms": 28.1,
+      "rps": 354.2
+    },
+    "tours_list": {
+      "requests": 2000,
+      "errors": 0,
+      "concurrency": 10,
+      "p50_ms": 60.6,
+      "p95_ms": 81.9,
+      "p99_ms": 97.5,
+      "mean_ms": 62.3,
+      "rps": 160.2
+    },
+    "applications_list": {
+      "requests": 2000,
+      "errors": 0,
+      "concurrency": 10,
+      "p50_ms": 122.3,
+      "p95_ms": 161.7,
+      "p99_ms": 181.6,
+      "mean_ms": 125.0,
+      "rps": 79.7
+    },
+    "conversations_list": {
+      "requests": 2000,
+      "errors": 0,
+      "concurrency": 10,
+      "p50_ms": 44.4,
+      "p95_ms": 63.9,
+      "p99_ms": 71.8,
+      "mean_ms": 45.7,
+      "rps": 218.2
+    },
+    "prospects_list_as_agent": {
+      "requests": 2000,
+      "errors": 0,
+      "concurrency": 10,
+      "p50_ms": 76.3,
+      "p95_ms": 98.2,
+      "p99_ms": 110.7,
+      "mean_ms": 77.2,
+      "rps": 129.2
+    }
+  }
+}

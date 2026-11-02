@@ -1,0 +1,3 @@
+  100000/100000 prospects
+Seeded {'prospects': 100000, 'tours': 200126, 'applications': 80092, 'conversations': 100000} in 149.9s
+Manager login: manager@perf-org.example.com / perf-pass-1234

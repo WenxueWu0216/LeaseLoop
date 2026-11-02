@@ -1,0 +1,103 @@
+=== DEEP PAGE (offset 49975) ===
+Limit  (cost=1281077.23..1281718.09 rows=25 width=443) (actual time=1228.371..1228.569 rows=25 loops=1)
+  ->  Result  (cost=0.88..2563435.30 rows=100000 width=443) (actual time=0.878..477.931 rows=50000 loops=1)
+        ->  Incremental Sort  (cost=0.88..35185.30 rows=100000 width=419) (actual time=0.764..124.196 rows=50000 loops=1)
+              Sort Key: crm_prospect.created_at DESC, crm_prospect.id DESC
+              Presorted Key: crm_prospect.created_at
+              Full-sort Groups: 1563  Sort Method: quicksort  Average Memory: 41kB  Peak Memory: 41kB
+              ->  Nested Loop Left Join  (cost=0.56..30685.30 rows=100000 width=419) (actual time=0.512..84.140 rows=50001 loops=1)
+                    ->  Nested Loop Left Join  (cost=0.42..28242.82 rows=100000 width=309) (actual time=0.485..66.728 rows=50001 loops=1)
+                          Join Filter: (crm_prospect.assigned_agent_id = accounts_user.id)
+                          Rows Removed by Join Filter: 314508
+                          ->  Index Scan using prospect_org_created on crm_prospect  (cost=0.42..12810.60 rows=100000 width=150) (actual time=0.459..24.993 rows=50001 loops=1)
+                                Index Cond: (organization_id = 1)
+                          ->  Materialize  (cost=0.00..1.17 rows=11 width=159) (actual time=0.000..0.000 rows=7 loops=50001)
+                                ->  Seq Scan on accounts_user  (cost=0.00..1.11 rows=11 width=159) (actual time=0.007..0.008 rows=11 loops=1)
+                    ->  Memoize  (cost=0.15..0.17 rows=1 width=110) (actual time=0.000..0.000 rows=1 loops=50001)
+                          Cache Key: crm_prospect.interested_property_id
+                          Cache Mode: logical
+                          Hits: 49980  Misses: 21  Evictions: 0  Overflows: 0  Memory Usage: 5kB
+                          ->  Index Scan using properties_property_pkey on properties_property  (cost=0.14..0.16 rows=1 width=110) (actual time=0.001..0.001 rows=1 loops=21)
+                                Index Cond: (id = crm_prospect.interested_property_id)
+        SubPlan 1
+          ->  GroupAggregate  (cost=0.42..8.47 rows=1 width=16) (actual time=0.002..0.002 rows=1 loops=50000)
+                ->  Index Scan using crm_tour_prospect_id_9f8464fe on crm_tour u0  (cost=0.42..8.46 rows=2 width=16) (actual time=0.001..0.002 rows=2 loops=50000)
+                      Index Cond: (prospect_id = crm_prospect.id)
+        SubPlan 2
+          ->  GroupAggregate  (cost=0.29..8.32 rows=1 width=16) (actual time=0.002..0.002 rows=1 loops=50000)
+                ->  Index Scan using crm_application_prospect_id_15f4d36f on crm_application u0_1  (cost=0.29..8.31 rows=1 width=16) (actual time=0.001..0.001 rows=1 loops=50000)
+                      Index Cond: (prospect_id = crm_prospect.id)
+        SubPlan 3
+          ->  Limit  (cost=8.47..8.48 rows=1 width=8) (actual time=0.002..0.002 rows=1 loops=50000)
+                ->  Sort  (cost=8.47..8.48 rows=1 width=8) (actual time=0.002..0.002 rows=1 loops=50000)
+                      Sort Key: u0_2.start
+                      Sort Method: quicksort  Memory: 25kB
+                      ->  Index Scan using crm_tour_prospect_id_9f8464fe on crm_tour u0_2  (cost=0.42..8.46 rows=1 width=8) (actual time=0.001..0.001 rows=1 loops=50000)
+                            Index Cond: (prospect_id = crm_prospect.id)
+                            Filter: ((start >= '2026-11-02 18:47:14.459833+00'::timestamp with time zone) AND ((status)::text = 'SCHEDULED'::text))
+                            Rows Removed by Filter: 1
+Planning Time: 2.147 ms
+JIT:
+  Functions: 50
+  Options: Inlining true, Optimization true, Expressions true, Deforming true
+  Timing: Generation 3.471 ms, Inlining 96.214 ms, Optimization 393.111 ms, Emission 259.408 ms, Total 752.204 ms
+Execution Time: 1248.042 ms
+=== PAGE 1 ===
+Limit  (cost=0.88..641.74 rows=25 width=443) (actual time=0.487..0.855 rows=25 loops=1)
+  ->  Result  (cost=0.88..2563435.30 rows=100000 width=443) (actual time=0.486..0.851 rows=25 loops=1)
+        ->  Incremental Sort  (cost=0.88..35185.30 rows=100000 width=419) (actual time=0.438..0.443 rows=25 loops=1)
+              Sort Key: crm_prospect.created_at DESC, crm_prospect.id DESC
+              Presorted Key: crm_prospect.created_at
+              Full-sort Groups: 1  Sort Method: quicksort  Average Memory: 37kB  Peak Memory: 37kB
+              ->  Nested Loop Left Join  (cost=0.56..30685.30 rows=100000 width=419) (actual time=0.249..0.398 rows=26 loops=1)
+                    ->  Nested Loop Left Join  (cost=0.42..28242.82 rows=100000 width=309) (actual time=0.233..0.332 rows=26 loops=1)
+                          Join Filter: (crm_prospect.assigned_agent_id = accounts_user.id)
+                          Rows Removed by Join Filter: 165
+                          ->  Index Scan using prospect_org_created on crm_prospect  (cost=0.42..12810.60 rows=100000 width=150) (actual time=0.212..0.241 rows=26 loops=1)
+                                Index Cond: (organization_id = 1)
+                          ->  Materialize  (cost=0.00..1.17 rows=11 width=159) (actual time=0.002..0.002 rows=7 loops=26)
+                                ->  Seq Scan on accounts_user  (cost=0.00..1.11 rows=11 width=159) (actual time=0.007..0.008 rows=11 loops=1)
+                    ->  Memoize  (cost=0.15..0.17 rows=1 width=110) (actual time=0.002..0.002 rows=1 loops=26)
+                          Cache Key: crm_prospect.interested_property_id
+                          Cache Mode: logical
+                          Hits: 11  Misses: 15  Evictions: 0  Overflows: 0  Memory Usage: 4kB
+                          ->  Index Scan using properties_property_pkey on properties_property  (cost=0.14..0.16 rows=1 width=110) (actual time=0.001..0.002 rows=1 loops=15)
+                                Index Cond: (id = crm_prospect.interested_property_id)
+        SubPlan 1
+          ->  GroupAggregate  (cost=0.42..8.47 rows=1 width=16) (actual time=0.006..0.006 rows=1 loops=25)
+                ->  Index Scan using crm_tour_prospect_id_9f8464fe on crm_tour u0  (cost=0.42..8.46 rows=2 width=16) (actual time=0.004..0.005 rows=2 loops=25)
+                      Index Cond: (prospect_id = crm_prospect.id)
+        SubPlan 2
+          ->  GroupAggregate  (cost=0.29..8.32 rows=1 width=16) (actual time=0.004..0.004 rows=1 loops=25)
+                ->  Index Scan using crm_application_prospect_id_15f4d36f on crm_application u0_1  (cost=0.29..8.31 rows=1 width=16) (actual time=0.004..0.004 rows=1 loops=25)
+                      Index Cond: (prospect_id = crm_prospect.id)
+        SubPlan 3
+          ->  Limit  (cost=8.47..8.48 rows=1 width=8) (actual time=0.004..0.004 rows=0 loops=25)
+                ->  Sort  (cost=8.47..8.48 rows=1 width=8) (actual time=0.004..0.004 rows=0 loops=25)
+                      Sort Key: u0_2.start
+                      Sort Method: quicksort  Memory: 25kB
+                      ->  Index Scan using crm_tour_prospect_id_9f8464fe on crm_tour u0_2  (cost=0.42..8.46 rows=1 width=8) (actual time=0.002..0.002 rows=1 loops=25)
+                            Index Cond: (prospect_id = crm_prospect.id)
+                            Filter: ((start >= '2026-11-02 18:47:14.459833+00'::timestamp with time zone) AND ((status)::text = 'SCHEDULED'::text))
+                            Rows Removed by Filter: 1
+Planning Time: 0.797 ms
+Execution Time: 0.973 ms
+=== APPLICATIONS ===
+Limit  (cost=4264.29..4264.35 rows=25 width=81) (actual time=48.830..48.835 rows=25 loops=1)
+  ->  Sort  (cost=4264.29..4464.52 rows=80092 width=81) (actual time=48.828..48.831 rows=25 loops=1)
+        Sort Key: created_at DESC
+        Sort Method: top-N heapsort  Memory: 31kB
+        ->  Seq Scan on crm_application  (cost=0.00..2004.15 rows=80092 width=81) (actual time=0.007..20.467 rows=80092 loops=1)
+              Filter: (organization_id = 1)
+Planning Time: 0.217 ms
+Execution Time: 48.858 ms
+=== DEEP PAGE, no annotations ===
+Limit  (cost=8651.25..8655.58 rows=25 width=150) (actual time=41.809..41.825 rows=25 loops=1)
+  ->  Incremental Sort  (cost=0.56..17310.60 rows=100000 width=150) (actual time=0.245..40.602 rows=50000 loops=1)
+        Sort Key: created_at DESC, id DESC
+        Presorted Key: created_at
+        Full-sort Groups: 1563  Sort Method: quicksort  Average Memory: 33kB  Peak Memory: 33kB
+        ->  Index Scan using prospect_org_created on crm_prospect  (cost=0.42..12810.60 rows=100000 width=150) (actual time=0.191..21.843 rows=50001 loops=1)
+              Index Cond: (organization_id = 1)
+Planning Time: 0.188 ms
+Execution Time: 41.855 ms
