@@ -250,7 +250,12 @@ class Application(OrgOwnedModel):
     decided_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
-        indexes = [models.Index(fields=["organization", "status"], name="application_org_status")]
+        indexes = [
+            models.Index(fields=["organization", "status"], name="application_org_status"),
+            # The list endpoint orders by -created_at; without this, Postgres
+            # scans and heap-sorts every application in the org.
+            models.Index(fields=["organization", "-created_at"], name="application_org_created"),
+        ]
 
 
 class ApplicationDocument(OrgOwnedModel):
