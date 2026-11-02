@@ -10,6 +10,10 @@ class ProspectViewSet(OrgScopedModelViewSet):
     queryset = models.Prospect.objects.order_by("-created_at", "-id")
     serializer_class = serializers.ProspectSerializer
 
+    def get_queryset(self):
+        # Agent, property, counts and next tour in the same query: no N+1.
+        return super().get_queryset().with_list_data()
+
     def scope_for_agent(self, qs):
         return qs.filter(prospect_visibility(self.request.user))
 

@@ -1,6 +1,8 @@
 from django.conf import settings
 from django.db import models
-from django.db.models import F, Q
+from django.db.models import Count, F, OuterRef, Q, Subquery
+from django.db.models.functions import Coalesce
+from django.utils import timezone
 
 from apps.core.models import OrgOwnedModel
 
@@ -9,6 +11,43 @@ class Channel(models.TextChoices):
     EMAIL = "EMAIL", "Email"
     SMS = "SMS", "SMS"
     CHAT = "CHAT", "Chat"
+
+
+def _count_subquery(model: type[models.Model]) -> Coalesce:
+    """Correlated COUNT(*) per prospect.
+
+    A subquery per counter (rather than two ``Count()`` joins) avoids the row
+    fan-out that makes joined counts multiply each other.
+    """
+    sub = (
+        model.objects.filter(prospect=OuterRef("pk"))
+        .order_by()
+        .values("prospect")
+        .annotate(n=Count("pk"))
+        .values("n")
+    )
+    return Coalesce(Subquery(sub, output_field=models.IntegerField()), 0)
+
+
+class ProspectQuerySet(models.QuerySet):
+    def with_list_data(self) -> "ProspectQuerySet":
+        """Everything the list serializer reads, in one SQL statement.
+
+        Without this, each row costs extra queries for the agent, the
+        property, two counts and the next tour (the N+1 problem).
+        """
+        next_tour = (
+            Tour.objects.filter(
+                prospect=OuterRef("pk"), status=Tour.Status.SCHEDULED, start__gte=timezone.now()
+            )
+            .order_by("start")
+            .values("start")[:1]
+        )
+        return self.select_related("assigned_agent", "interested_property").annotate(
+            tour_count=_count_subquery(Tour),
+            application_count=_count_subquery(Application),
+            next_tour_at=Subquery(next_tour),
+        )
 
 
 class Prospect(OrgOwnedModel):
@@ -61,6 +100,8 @@ class Prospect(OrgOwnedModel):
     notes = models.TextField(blank=True)
     last_contacted_at = models.DateTimeField(null=True, blank=True)
     last_followup_at = models.DateTimeField(null=True, blank=True)
+
+    objects = ProspectQuerySet.as_manager()
 
     class Meta:
         constraints = [

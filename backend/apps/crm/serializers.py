@@ -1,3 +1,4 @@
+from django.utils import timezone
 from rest_framework import serializers
 
 from apps.accounts.models import User
@@ -40,11 +41,45 @@ class ProspectSerializer(AgentAssignmentMixin, serializers.ModelSerializer):
     interested_property = OrgScopedPrimaryKeyRelatedField(
         queryset=Property.objects.all(), required=False, allow_null=True
     )
+    # Read-only display data for the prospect list. The list queryset provides
+    # all of it via ProspectQuerySet.with_list_data(); the per-object fallbacks
+    # below only run for single objects (e.g. the response to a create).
+    assigned_agent_name = serializers.SerializerMethodField()
+    interested_property_name = serializers.SerializerMethodField()
+    tour_count = serializers.SerializerMethodField()
+    application_count = serializers.SerializerMethodField()
+    next_tour_at = serializers.SerializerMethodField()
 
     class Meta:
         model = models.Prospect
         exclude = ["organization"]
         read_only_fields = ["created_at", "updated_at", "last_contacted_at", "last_followup_at"]
+
+    def get_assigned_agent_name(self, obj) -> str | None:
+        return str(obj.assigned_agent) if obj.assigned_agent_id else None
+
+    def get_interested_property_name(self, obj) -> str | None:
+        return obj.interested_property.name if obj.interested_property_id else None
+
+    def get_tour_count(self, obj) -> int:
+        n = getattr(obj, "tour_count", None)
+        return obj.tours.count() if n is None else n
+
+    def get_application_count(self, obj) -> int:
+        n = getattr(obj, "application_count", None)
+        return obj.applications.count() if n is None else n
+
+    def get_next_tour_at(self, obj) -> str | None:
+        if hasattr(obj, "next_tour_at"):
+            start = obj.next_tour_at
+        else:
+            tour = (
+                obj.tours.filter(status=models.Tour.Status.SCHEDULED, start__gte=timezone.now())
+                .order_by("start")
+                .first()
+            )
+            start = tour.start if tour else None
+        return serializers.DateTimeField().to_representation(start) if start else None
 
 
 class TourSerializer(AgentAssignmentMixin, serializers.ModelSerializer):
