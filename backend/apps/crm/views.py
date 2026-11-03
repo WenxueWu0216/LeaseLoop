@@ -23,6 +23,22 @@ class ProspectViewSet(OrgScopedModelViewSet):
     filterset_class = filters.ProspectFilter
     ordering_fields = ["created_at", "last_contacted_at"]
 
+    def list(self, request, *args, **kwargs):
+        """Page over ids first, then load and join only the rows on the page.
+
+        With OFFSET, Postgres builds every skipped row: on the last page of a 25K-row
+        org it sorted and joined all 25,000 rows to return 25. The id query touches
+        crm_prospect alone; the joins and the tours prefetch run for one page.
+        """
+        queryset = self.filter_queryset(self.get_queryset())
+        ids = queryset.select_related(None).prefetch_related(None).values_list("pk", flat=True)
+        page_ids = self.paginate_queryset(ids)
+        if page_ids is None:
+            return super().list(request, *args, **kwargs)
+        rows = {p.pk: p for p in queryset.filter(pk__in=list(page_ids))}
+        serializer = self.get_serializer([rows[pk] for pk in page_ids], many=True)
+        return self.get_paginated_response(serializer.data)
+
     def get_queryset(self):
         qs = super().get_queryset()
         if self.action in ("list", "retrieve"):
