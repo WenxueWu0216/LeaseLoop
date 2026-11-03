@@ -53,5 +53,14 @@ services:
     <<: *backend
     command: celery -A config beat -l info -s /tmp/celerybeat-schedule
 
+  frontend:
+    build: ./frontend
+    environment:
+      VITE_API_PROXY: http://django:8000
+    ports: ["5173:5173"]
+    volumes:
+      - ./frontend/src:/app/src
+    depends_on: [django]
+
 volumes:
   pgdata:

@@ -1,0 +1,129 @@
+### ?
+--- query 2: SELECT COUNT(*) AS "__count" FROM "crm_prospect" WHERE "crm_prospect"."organization_id" = 13...
+Aggregate  (cost=592.95..592.96 rows=1 width=8) (actual time=2.501..2.502 rows=1 loops=1)
+  ->  Index Only Scan using crm_prospect_organization_id_7d94b6b0 on crm_prospect  (cost=0.29..530.37 rows=25033 width=0) (actual time=0.014..1.517 rows=25000 loops=1)
+        Index Cond: (organization_id = 13)
+        Heap Fetches: 0
+Planning Time: 0.077 ms
+Execution Time: 2.516 ms
+--- query 3: SELECT "crm_prospect"."id", "crm_prospect"."created_at", "crm_prospect"."updated_at", "crm_prospect"."organization_id", "crm_prospect"."first_name", "crm_prospe...
+Limit  (cost=1.00..8.94 rows=25 width=413) (actual time=0.188..0.191 rows=25 loops=1)
+  ->  Incremental Sort  (cost=1.00..7955.46 rows=25033 width=413) (actual time=0.187..0.189 rows=25 loops=1)
+        Sort Key: crm_prospect.created_at DESC, crm_prospect.id DESC
+        Presorted Key: crm_prospect.created_at
+        Full-sort Groups: 1  Sort Method: quicksort  Average Memory: 37kB  Peak Memory: 37kB
+        ->  Nested Loop Left Join  (cost=0.72..6829.25 rows=25033 width=413) (actual time=0.043..0.155 rows=26 loops=1)
+              ->  Nested Loop Left Join  (cost=0.57..6214.68 rows=25033 width=296) (actual time=0.034..0.089 rows=26 loops=1)
+                    ->  Index Scan using prospect_org_created on crm_prospect  (cost=0.42..5591.56 rows=25033 width=148) (actual time=0.015..0.042 rows=26 loops=1)
+                          Index Cond: (organization_id = 13)
+                    ->  Memoize  (cost=0.15..0.17 rows=1 width=148) (actual time=0.001..0.001 rows=1 loops=26)
+                          Cache Key: crm_prospect.assigned_agent_id
+                          Cache Mode: logical
+                          Hits: 18  Misses: 8  Evictions: 0  Overflows: 0  Memory Usage: 2kB
+                          ->  Index Scan using accounts_user_pkey on accounts_user  (cost=0.14..0.16 rows=1 width=148) (actual time=0.002..0.002 rows=1 loops=8)
+                                Index Cond: (id = crm_prospect.assigned_agent_id)
+              ->  Memoize  (cost=0.15..0.17 rows=1 width=117) (actual time=0.002..0.002 rows=1 loops=26)
+                    Cache Key: crm_prospect.interested_property_id
+                    Cache Mode: logical
+                    Hits: 20  Misses: 6  Evictions: 0  Overflows: 0  Memory Usage: 2kB
+                    ->  Index Scan using properties_property_pkey on properties_property  (cost=0.14..0.16 rows=1 width=117) (actual time=0.002..0.002 rows=1 loops=6)
+                          Index Cond: (id = crm_prospect.interested_property_id)
+Planning Time: 0.307 ms
+Execution Time: 0.237 ms
+### ?status=CONTACTED
+--- query 2: SELECT COUNT(*) AS "__count" FROM "crm_prospect" WHERE ("crm_prospect"."organization_id" = 13 AND "crm_prospect"."status" = 'CONTACTED')...
+Aggregate  (cost=324.84..324.85 rows=1 width=8) (actual time=0.967..0.968 rows=1 loops=1)
+  ->  Index Only Scan using prospect_org_status_created on crm_prospect  (cost=0.42..309.24 rows=6241 width=0) (actual time=0.020..0.721 rows=6122 loops=1)
+        Index Cond: ((organization_id = 13) AND (status = 'CONTACTED'::text))
+        Heap Fetches: 0
+Planning Time: 0.125 ms
+Execution Time: 0.985 ms
+--- query 3: SELECT "crm_prospect"."id", "crm_prospect"."created_at", "crm_prospect"."updated_at", "crm_prospect"."organization_id", "crm_prospect"."first_name", "crm_prospe...
+Limit  (cost=1.53..22.85 rows=25 width=413) (actual time=0.140..0.143 rows=25 loops=1)
+  ->  Incremental Sort  (cost=1.53..5323.12 rows=6241 width=413) (actual time=0.140..0.141 rows=25 loops=1)
+        Sort Key: crm_prospect.created_at DESC, crm_prospect.id DESC
+        Presorted Key: crm_prospect.created_at
+        Full-sort Groups: 1  Sort Method: quicksort  Average Memory: 37kB  Peak Memory: 37kB
+        ->  Nested Loop Left Join  (cost=0.72..5042.28 rows=6241 width=413) (actual time=0.041..0.109 rows=26 loops=1)
+              ->  Nested Loop Left Join  (cost=0.57..4886.59 rows=6241 width=296) (actual time=0.032..0.084 rows=26 loops=1)
+                    ->  Index Scan using prospect_org_status_created on crm_prospect  (cost=0.42..4727.29 rows=6241 width=148) (actual time=0.015..0.044 rows=26 loops=1)
+                          Index Cond: ((organization_id = 13) AND ((status)::text = 'CONTACTED'::text))
+                    ->  Memoize  (cost=0.15..0.17 rows=1 width=148) (actual time=0.001..0.001 rows=1 loops=26)
+                          Cache Key: crm_prospect.assigned_agent_id
+                          Cache Mode: logical
+                          Hits: 17  Misses: 9  Evictions: 0  Overflows: 0  Memory Usage: 3kB
+                          ->  Index Scan using accounts_user_pkey on accounts_user  (cost=0.14..0.16 rows=1 width=148) (actual time=0.002..0.002 rows=1 loops=9)
+                                Index Cond: (id = crm_prospect.assigned_agent_id)
+              ->  Memoize  (cost=0.15..0.17 rows=1 width=117) (actual time=0.001..0.001 rows=1 loops=26)
+                    Cache Key: crm_prospect.interested_property_id
+                    Cache Mode: logical
+                    Hits: 21  Misses: 5  Evictions: 0  Overflows: 0  Memory Usage: 1kB
+                    ->  Index Scan using properties_property_pkey on properties_property  (cost=0.14..0.16 rows=1 width=117) (actual time=0.002..0.002 rows=1 loops=5)
+                          Index Cond: (id = crm_prospect.interested_property_id)
+Planning Time: 0.344 ms
+Execution Time: 0.194 ms
+### ?q=smith
+--- query 2: SELECT COUNT(*) AS "__count" FROM "crm_prospect" WHERE ("crm_prospect"."organization_id" = 13 AND (UPPER("crm_prospect"."first_name"::text) LIKE UPPER('%smith%'...
+Aggregate  (cost=2327.10..2327.11 rows=1 width=8) (actual time=27.400..27.401 rows=1 loops=1)
+  ->  Index Scan using crm_prospect_organization_id_7d94b6b0 on crm_prospect  (cost=0.29..2326.70 rows=160 width=0) (actual time=0.080..27.365 rows=451 loops=1)
+        Index Cond: (organization_id = 13)
+        Filter: ((upper((first_name)::text) ~~ '%SMITH%'::text) OR (upper((last_name)::text) ~~ '%SMITH%'::text) OR (upper((email)::text) ~~ '%SMITH%'::text) OR (upper((phone)::text) ~~ '%SMITH%'::text))
+        Rows Removed by Filter: 24549
+Planning Time: 0.126 ms
+Execution Time: 27.425 ms
+--- query 3: SELECT "crm_prospect"."id", "crm_prospect"."created_at", "crm_prospect"."updated_at", "crm_prospect"."organization_id", "crm_prospect"."first_name", "crm_prospe...
+Limit  (cost=39.02..995.15 rows=25 width=413) (actual time=2.268..2.271 rows=25 loops=1)
+  ->  Incremental Sort  (cost=39.02..6158.26 rows=160 width=413) (actual time=2.267..2.269 rows=25 loops=1)
+        Sort Key: crm_prospect.created_at DESC, crm_prospect.id DESC
+        Presorted Key: crm_prospect.created_at
+        Full-sort Groups: 1  Sort Method: quicksort  Average Memory: 37kB  Peak Memory: 37kB
+        ->  Nested Loop Left Join  (cost=0.57..6151.06 rows=160 width=413) (actual time=0.201..2.224 rows=26 loops=1)
+              ->  Nested Loop Left Join  (cost=0.42..6139.57 rows=160 width=265) (actual time=0.184..2.178 rows=26 loops=1)
+                    Join Filter: (crm_prospect.interested_property_id = properties_property.id)
+                    Rows Removed by Join Filter: 329
+                    ->  Index Scan using prospect_org_created on crm_prospect  (cost=0.42..6092.22 rows=160 width=148) (actual time=0.160..2.107 rows=26 loops=1)
+                          Index Cond: (organization_id = 13)
+                          Filter: ((upper((first_name)::text) ~~ '%SMITH%'::text) OR (upper((last_name)::text) ~~ '%SMITH%'::text) OR (upper((email)::text) ~~ '%SMITH%'::text) OR (upper((phone)::text) ~~ '%SMITH%'::text))
+                          Rows Removed by Filter: 1234
+                    ->  Materialize  (cost=0.00..1.30 rows=20 width=117) (actual time=0.000..0.001 rows=14 loops=26)
+                          ->  Seq Scan on properties_property  (cost=0.00..1.20 rows=20 width=117) (actual time=0.005..0.009 rows=20 loops=1)
+              ->  Memoize  (cost=0.15..0.24 rows=1 width=148) (actual time=0.001..0.001 rows=1 loops=26)
+                    Cache Key: crm_prospect.assigned_agent_id
+                    Cache Mode: logical
+                    Hits: 17  Misses: 9  Evictions: 0  Overflows: 0  Memory Usage: 3kB
+                    ->  Index Scan using accounts_user_pkey on accounts_user  (cost=0.14..0.23 rows=1 width=148) (actual time=0.002..0.002 rows=1 loops=9)
+                          Index Cond: (id = crm_prospect.assigned_agent_id)
+Planning Time: 0.399 ms
+Execution Time: 2.324 ms
+### ?page=500
+--- query 2: SELECT COUNT(*) AS "__count" FROM "crm_prospect" WHERE "crm_prospect"."organization_id" = 13...
+Aggregate  (cost=592.95..592.96 rows=1 width=8) (actual time=2.470..2.471 rows=1 loops=1)
+  ->  Index Only Scan using crm_prospect_organization_id_7d94b6b0 on crm_prospect  (cost=0.29..530.37 rows=25033 width=0) (actual time=0.015..1.451 rows=25000 loops=1)
+        Index Cond: (organization_id = 13)
+        Heap Fetches: 0
+Planning Time: 0.107 ms
+Execution Time: 2.487 ms
+--- query 3: SELECT "crm_prospect"."id", "crm_prospect"."created_at", "crm_prospect"."updated_at", "crm_prospect"."organization_id", "crm_prospect"."first_name", "crm_prospe...
+Limit  (cost=3965.04..3972.99 rows=25 width=413) (actual time=28.414..28.479 rows=25 loops=1)
+  ->  Incremental Sort  (cost=1.00..7955.46 rows=25033 width=413) (actual time=0.159..28.031 rows=12500 loops=1)
+        Sort Key: crm_prospect.created_at DESC, crm_prospect.id DESC
+        Presorted Key: crm_prospect.created_at
+        Full-sort Groups: 391  Sort Method: quicksort  Average Memory: 40kB  Peak Memory: 40kB
+        ->  Nested Loop Left Join  (cost=0.72..6829.25 rows=25033 width=413) (actual time=0.041..18.515 rows=12501 loops=1)
+              ->  Nested Loop Left Join  (cost=0.57..6214.68 rows=25033 width=296) (actual time=0.032..13.639 rows=12501 loops=1)
+                    ->  Index Scan using prospect_org_created on crm_prospect  (cost=0.42..5591.56 rows=25033 width=148) (actual time=0.010..5.919 rows=12501 loops=1)
+                          Index Cond: (organization_id = 13)
+                    ->  Memoize  (cost=0.15..0.17 rows=1 width=148) (actual time=0.000..0.000 rows=1 loops=12501)
+                          Cache Key: crm_prospect.assigned_agent_id
+                          Cache Mode: logical
+                          Hits: 12492  Misses: 9  Evictions: 0  Overflows: 0  Memory Usage: 3kB
+                          ->  Index Scan using accounts_user_pkey on accounts_user  (cost=0.14..0.16 rows=1 width=148) (actual time=0.002..0.002 rows=1 loops=9)
+                                Index Cond: (id = crm_prospect.assigned_agent_id)
+              ->  Memoize  (cost=0.15..0.17 rows=1 width=117) (actual time=0.000..0.000 rows=1 loops=12501)
+                    Cache Key: crm_prospect.interested_property_id
+                    Cache Mode: logical
+                    Hits: 12495  Misses: 6  Evictions: 0  Overflows: 0  Memory Usage: 2kB
+                    ->  Index Scan using properties_property_pkey on properties_property  (cost=0.14..0.16 rows=1 width=117) (actual time=0.002..0.002 rows=1 loops=6)
+                          Index Cond: (id = crm_prospect.interested_property_id)
+Planning Time: 0.319 ms
+Execution Time: 28.536 ms

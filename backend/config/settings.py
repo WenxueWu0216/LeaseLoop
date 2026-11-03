@@ -1,6 +1,8 @@
 import os
 from pathlib import Path
 
+from celery.schedules import crontab
+
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
@@ -32,9 +34,12 @@ INSTALLED_APPS = [
     "apps.accounts",
     "apps.properties",
     "apps.crm",
+    "apps.integrations",
+    "apps.assistant",
 ]
 
 MIDDLEWARE = [
+    "apps.core.middleware.RequestMetricsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -102,15 +107,25 @@ REST_FRAMEWORK = {
         "rest_framework.filters.OrderingFilter",
         "rest_framework.filters.SearchFilter",
     ],
-    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "DEFAULT_PAGINATION_CLASS": "apps.core.pagination.StandardPagination",
     "PAGE_SIZE": 25,
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    "DEFAULT_THROTTLE_RATES": {"assistant_chat": env("ASSISTANT_CHAT_RATE", "30/min")},
 }
 
 SPECTACULAR_SETTINGS = {
     "TITLE": "LeaseLoop API",
     "DESCRIPTION": "Multi-tenant apartment leasing CRM",
     "VERSION": "0.1.0",
+    "ENUM_NAME_OVERRIDES": {
+        "ProspectStatusEnum": "apps.crm.models.Prospect.Status",
+        "TourStatusEnum": "apps.crm.models.Tour.Status",
+        "ApplicationStatusEnum": "apps.crm.models.Application.Status",
+        "LeaseStatusEnum": "apps.crm.models.Lease.Status",
+        "RenewalStatusEnum": "apps.crm.models.Renewal.Status",
+        "HandoffStatusEnum": "apps.crm.models.HandoffTask.Status",
+        "UnitStatusEnum": "apps.properties.models.Unit.Status",
+    },
 }
 
 REDIS_URL = env("REDIS_URL", "redis://localhost:6379/0")
@@ -119,13 +134,58 @@ CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", REDIS_URL)
 CELERY_TASK_ALWAYS_EAGER = env_bool("CELERY_TASK_ALWAYS_EAGER", False)
 CELERY_TASK_ACKS_LATE = True
 CELERY_TIMEZONE = TIME_ZONE
+CELERY_TASK_EAGER_PROPAGATES = True
+CELERY_BEAT_SCHEDULE = {
+    "tour-reminders": {
+        "task": "apps.integrations.tasks.send_tour_reminders",
+        "schedule": 300.0,
+    },
+    "stale-prospect-followups": {
+        "task": "apps.integrations.tasks.follow_up_stale_prospects",
+        "schedule": crontab(minute=7),
+    },
+    "ils-lead-sync": {
+        "task": "apps.integrations.tasks.sync_all_lead_sources",
+        "schedule": 900.0,
+    },
+}
+
+# Webhooks and outbound messaging
+TWILIO_AUTH_TOKEN = env("TWILIO_AUTH_TOKEN")
+SENDGRID_INBOUND_TOKEN = env("SENDGRID_INBOUND_TOKEN")
+# Public URL Twilio calls (signatures cover the exact URL); defaults to the request's own.
+WEBHOOK_PUBLIC_BASE_URL = env("WEBHOOK_PUBLIC_BASE_URL")
+OUTBOUND_BACKEND = env("OUTBOUND_BACKEND", "apps.integrations.outbound.LogBackend")
+ILS_FEED_DIR = env("ILS_FEED_DIR", str(BASE_DIR / "apps" / "integrations" / "sample_payloads"))
+FOLLOWUP_AFTER_DAYS = int(env("FOLLOWUP_AFTER_DAYS", "3"))
+FOLLOWUP_MAX_AGE_DAYS = int(env("FOLLOWUP_MAX_AGE_DAYS", "30"))
+FOLLOWUP_MAX = int(env("FOLLOWUP_MAX", "2"))
+FOLLOWUP_BATCH = int(env("FOLLOWUP_BATCH", "500"))
 
 ANTHROPIC_API_KEY = env("ANTHROPIC_API_KEY")
-LLM_PROVIDER = env("LLM_PROVIDER", "mock")
+LLM_PROVIDER = env("LLM_PROVIDER", "mock")  # mock | anthropic
+LLM_MODEL = env("LLM_MODEL", "claude-opus-5-5")
+LLM_EFFORT = env("LLM_EFFORT", "medium")
+# Below this cosine similarity, retrieval alone doesn't count as grounding (the answer
+# then needs a tool result or it is handed off). 0.20 sits above every unanswerable
+# question in evals/dev_questions.jsonl for the hashing embedder; see docs/assistant.md.
+ASSISTANT_MIN_RETRIEVAL_SCORE = float(env("ASSISTANT_MIN_RETRIEVAL_SCORE", "0.20"))
+
+# Requests slower than this, or with more queries than this, are logged at WARNING.
+SLOW_REQUEST_MS = int(env("SLOW_REQUEST_MS", "500"))
+MAX_QUERIES_PER_REQUEST = int(env("MAX_QUERIES_PER_REQUEST", "30"))
 
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
-    "handlers": {"console": {"class": "logging.StreamHandler"}},
+    "formatters": {"json": {"()": "apps.core.logging.JsonFormatter"}},
+    "handlers": {"console": {"class": "logging.StreamHandler", "formatter": "json"}},
     "root": {"handlers": ["console"], "level": env("LOG_LEVEL", "INFO")},
+    "loggers": {
+        "leaseloop.request": {
+            "handlers": ["console"],
+            "level": env("REQUEST_LOG_LEVEL", "INFO"),
+            "propagate": False,
+        },
+    },
 }

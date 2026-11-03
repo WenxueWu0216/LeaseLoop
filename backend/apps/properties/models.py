@@ -2,6 +2,7 @@ from decimal import Decimal
 
 from django.core.validators import MinValueValidator
 from django.db import models
+from django.db.models import Q
 
 from apps.core.models import OrgOwnedModel
 
@@ -15,9 +16,26 @@ class Property(OrgOwnedModel):
     timezone = models.CharField(max_length=64, default="America/New_York")
     phone = models.CharField(max_length=32, blank=True)
     email = models.EmailField(blank=True)
+    # Routing keys for inbound webhooks and the ILS feed.
+    inbound_email = models.EmailField(blank=True)
+    sms_number = models.CharField(max_length=20, blank=True)
+    ils_listing_id = models.CharField(max_length=50, blank=True)
 
     class Meta:
         verbose_name_plural = "properties"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["inbound_email"], condition=~Q(inbound_email=""), name="uniq_inbound_email"
+            ),
+            models.UniqueConstraint(
+                fields=["sms_number"], condition=~Q(sms_number=""), name="uniq_sms_number"
+            ),
+            models.UniqueConstraint(
+                fields=["ils_listing_id"],
+                condition=~Q(ils_listing_id=""),
+                name="uniq_ils_listing_id",
+            ),
+        ]
         indexes = [models.Index(fields=["organization", "name"], name="property_org_name")]
 
     def __str__(self) -> str:

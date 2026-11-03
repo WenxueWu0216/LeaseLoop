@@ -1,3 +1,4 @@
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from .models import Membership, Organization, User
@@ -45,6 +46,14 @@ class MembershipSerializer(serializers.ModelSerializer):
         return instance
 
 
+class MyMembershipSerializer(serializers.ModelSerializer):
+    organization = OrganizationSerializer(read_only=True)
+
+    class Meta:
+        model = Membership
+        fields = ["organization", "role"]
+
+
 class MeSerializer(serializers.ModelSerializer):
     memberships = serializers.SerializerMethodField()
 
@@ -52,8 +61,7 @@ class MeSerializer(serializers.ModelSerializer):
         model = User
         fields = ["id", "email", "first_name", "last_name", "memberships"]
 
+    @extend_schema_field(MyMembershipSerializer(many=True))
     def get_memberships(self, user):
-        return [
-            {"organization": OrganizationSerializer(m.organization).data, "role": m.role}
-            for m in user.memberships.select_related("organization")
-        ]
+        qs = user.memberships.select_related("organization").order_by("id")
+        return MyMembershipSerializer(qs, many=True).data

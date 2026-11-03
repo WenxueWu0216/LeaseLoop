@@ -6,6 +6,6 @@ psycopg[binary]==3.2.3
 celery[redis]==5.4.0
 redis==5.2.1
 pgvector==0.3.6
-anthropic==0.42.0
+anthropic==2.3.0
 Faker==33.1.0
 gunicorn==23.0.0

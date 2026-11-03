@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
 from apps.accounts.views import LoginView, MembershipViewSet, me
@@ -21,5 +21,7 @@ router.register("handoffs", crm.HandoffTaskViewSet, basename="handoff")
 urlpatterns = [
     path("auth/login/", LoginView.as_view(), name="login"),
     path("auth/me/", me, name="me"),
+    path("webhooks/", include("apps.integrations.urls")),
+    path("assistant/", include("apps.assistant.urls")),
     *router.urls,
 ]

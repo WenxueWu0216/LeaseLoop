@@ -1,0 +1,15 @@
+{
+  "_comment": "Form fields SendGrid Inbound Parse POSTs as multipart/form-data (attachments omitted).",
+  "headers": "Received: by mx0047p1mdw1.sendgrid.net with SMTP id 6WCVv7KAWn\nMessage-ID: <CAF8x9-renter-0001@mail.gmail.com>\nDate: Thu, 29 Oct 2026 14:12:08 -0400\nSubject: 2 bedroom availability\nFrom: Jane Rivera <jane.rivera@example.com>\nTo: leasing-1-1@inbound.leaseloop.dev\nContent-Type: multipart/alternative; boundary=\"000000000000a1b2\"",
+  "dkim": "{@gmail.com : pass}",
+  "to": "leasing-1-1@inbound.leaseloop.dev",
+  "from": "Jane Rivera <jane.rivera@example.com>",
+  "subject": "2 bedroom availability",
+  "text": "Hi! Is the 2 bedroom still available for December 1? I have a small dog. Could I tour this Saturday?",
+  "html": "<div>Hi! Is the 2 bedroom still available for December 1? I have a small dog. Could I tour this Saturday?</div>",
+  "sender_ip": "209.85.220.41",
+  "envelope": "{\"to\":[\"leasing-1-1@inbound.leaseloop.dev\"],\"from\":\"jane.rivera@example.com\"}",
+  "attachments": "0",
+  "charsets": "{\"to\":\"UTF-8\",\"html\":\"UTF-8\",\"subject\":\"UTF-8\",\"from\":\"UTF-8\",\"text\":\"UTF-8\"}",
+  "SPF": "pass"
+}

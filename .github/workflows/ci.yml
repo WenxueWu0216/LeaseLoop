@@ -1,0 +1,198 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "claude/**"]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "22"
+  POSTGRES_DB: leaseloop
+  POSTGRES_USER: leaseloop
+  POSTGRES_PASSWORD: leaseloop
+  POSTGRES_HOST: localhost
+  REDIS_URL: redis://localhost:6379/0
+  DJANGO_SECRET_KEY: ci-not-secret
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.txt
+      - run: pip install ruff==0.8.4
+      - name: Ruff
+        run: |
+          ruff check backend evals scripts
+          ruff format --check backend evals scripts
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      - name: ESLint and TypeScript
+        working-directory: frontend
+        run: |
+          npm run lint
+          npm run typecheck
+
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: leaseloop
+          POSTGRES_USER: leaseloop
+          POSTGRES_PASSWORD: leaseloop
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U leaseloop" --health-interval 2s
+          --health-timeout 3s --health-retries 30
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.txt
+      - run: pip install -r requirements-dev.txt
+      - name: Migrations are in sync
+        run: python manage.py makemigrations --check --dry-run
+      - name: pytest
+        run: pytest --create-db -p no:cacheprovider
+
+  eval:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: leaseloop
+          POSTGRES_USER: leaseloop
+          POSTGRES_PASSWORD: leaseloop
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U leaseloop" --health-interval 2s
+          --health-timeout 3s --health-retries 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.txt
+      - run: pip install -r backend/requirements-dev.txt
+      - name: Assistant eval (mock provider smoke test)
+        # Fails on any hallucinated price or accuracy below 85%.
+        run: python evals/run_eval.py --provider mock --min-accuracy 0.85 --out eval-results.md
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eval-results
+          path: eval-results.md
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - name: Jest + React Testing Library
+        run: npm test -- --ci
+      - name: Production build
+        run: npm run build
+
+  e2e:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_DB: leaseloop
+          POSTGRES_USER: leaseloop
+          POSTGRES_PASSWORD: leaseloop
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U leaseloop" --health-interval 2s
+          --health-timeout 3s --health-retries 30
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+    env:
+      SENDGRID_INBOUND_TOKEN: e2e-token
+      CELERY_TASK_ALWAYS_EAGER: "true"
+      DJANGO_DEBUG: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.txt
+      - run: pip install -r backend/requirements-dev.txt
+      - name: Database and demo data
+        working-directory: backend
+        run: |
+          python manage.py migrate --noinput
+          python manage.py seed_demo --prospects 500 --orgs 2 --days 60
+      - name: Start API
+        working-directory: backend
+        run: |
+          gunicorn config.wsgi:application --bind 127.0.0.1:8000 --workers 2 \
+            --daemon --error-logfile ../gunicorn.log --capture-output
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      - run: npx playwright install --with-deps chromium
+        working-directory: frontend
+      - name: Start frontend
+        working-directory: frontend
+        run: |
+          nohup npx vite --port 5173 --strictPort > ../vite.log 2>&1 &
+          for i in $(seq 1 60); do
+            curl -sf http://127.0.0.1:5173/ > /dev/null && \
+            curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:5173/api/auth/me/ | grep -q 401 && exit 0
+            sleep 1
+          done
+          echo "stack did not come up"; cat ../vite.log ../gunicorn.log; exit 1
+      - name: Playwright (lead -> signed lease)
+        working-directory: frontend
+        run: npx playwright test
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            frontend/playwright-report
+            frontend/test-results
+            gunicorn.log
+            vite.log
