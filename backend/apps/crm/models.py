@@ -75,7 +75,11 @@ class Prospect(OrgOwnedModel):
             models.Index(
                 fields=["organization", "status", "-created_at"], name="prospect_org_status_created"
             ),
-            models.Index(fields=["organization", "-created_at"], name="prospect_org_created"),
+            # Matches the list's ORDER BY (-created_at, -id) exactly, so paging over ids is
+            # an index-only scan with no sort.
+            models.Index(
+                fields=["organization", "-created_at", "-id"], name="prospect_org_created_id"
+            ),
             models.Index(
                 fields=["organization", "assigned_agent", "status"],
                 name="prospect_org_agent_status",
