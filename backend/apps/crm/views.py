@@ -1,7 +1,8 @@
 from datetime import timedelta
 
 from django.db import transaction
-from django.db.models import Count, OuterRef, Prefetch, Q, Subquery
+from django.db.models import Count, OuterRef, Prefetch, Subquery
+from django.db.models.functions import Coalesce
 from django.utils import timezone
 from drf_spectacular.utils import extend_schema
 from rest_framework import mixins, viewsets
@@ -22,6 +23,22 @@ class ProspectViewSet(OrgScopedModelViewSet):
     serializer_class = serializers.ProspectSerializer
     filterset_class = filters.ProspectFilter
     ordering_fields = ["created_at", "last_contacted_at"]
+
+    def list(self, request, *args, **kwargs):
+        """Page over ids first, then load and join only the rows on the page.
+
+        With OFFSET, Postgres builds every skipped row: on the last page of a 25K-row
+        org it sorted and joined all 25,000 rows to return 25. The id query touches
+        crm_prospect alone; the joins and the tours prefetch run for one page.
+        """
+        queryset = self.filter_queryset(self.get_queryset())
+        ids = queryset.select_related(None).prefetch_related(None).values_list("pk", flat=True)
+        page_ids = self.paginate_queryset(ids)
+        if page_ids is None:
+            return super().list(request, *args, **kwargs)
+        rows = {p.pk: p for p in queryset.filter(pk__in=list(page_ids))}
+        serializer = self.get_serializer([rows[pk] for pk in page_ids], many=True)
+        return self.get_paginated_response(serializer.data)
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -101,13 +118,23 @@ class ConversationViewSet(
         qs = super().get_queryset()
         if self.action == "list":
             last = models.Message.objects.filter(conversation=OuterRef("pk")).order_by("-sent_at")
+            # Every extra column is a correlated subquery. An aggregate (Count over a join)
+            # would GROUP BY all of the org's conversations before ORDER BY/LIMIT picks
+            # the page; subqueries only run for the rows on the page.
+            open_handoffs = (
+                models.HandoffTask.objects.filter(
+                    conversation=OuterRef("pk"), status=models.HandoffTask.Status.OPEN
+                )
+                .order_by()
+                .values("conversation")
+                .annotate(n=Count("id"))
+                .values("n")
+            )
             qs = qs.select_related("prospect").annotate(
                 last_body=Subquery(last.values("body")[:1]),
                 last_direction=Subquery(last.values("direction")[:1]),
                 last_is_assistant=Subquery(last.values("is_assistant")[:1]),
-                open_handoffs=Count(
-                    "handoffs", filter=Q(handoffs__status=models.HandoffTask.Status.OPEN)
-                ),
+                open_handoffs=Coalesce(Subquery(open_handoffs), 0),
             )
         return qs
 

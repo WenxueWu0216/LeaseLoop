@@ -2,7 +2,14 @@
 
 Every number on this page was measured on the setup below. Where a number varies between
 runs, the page says so. The raw `EXPLAIN ANALYZE` output is in
-[`perf/explain_after.txt`](perf/explain_after.txt).
+[`perf/explain_after.txt`](perf/explain_after.txt) (sections 1–4) and
+[`perf/explain_2026-11_before.txt`](perf/explain_2026-11_before.txt) /
+[`perf/explain_2026-11_after.txt`](perf/explain_2026-11_after.txt) (section 5).
+
+> **Current numbers are in section 5.** Sections 1–4 were measured before the inbox gained
+> its last-message and handoff columns. That change slowed the inbox down, and the 100-user
+> p95 for `main` as merged was 99 ms, not 55 ms. Section 5 shows the regression, its fix, and
+> a fresh load test.
 
 ## Summary
 
@@ -11,13 +18,22 @@ runs, the page says so. The raw `EXPLAIN ANALYZE` output is in
 | Queries per prospect-list page (25 rows) | 72 | 5 |
 | Prospect list page load, sequential p50 | 82.7 ms | 15.7 ms (**5.3x**) |
 | Prospect list p50 under load (100 users) | 94 ms | 22 ms (**4.3x**) |
-| All endpoints p95 under load (100 users, ~75 req/s) | 176 ms | **55 ms** |
+| All endpoints p95 under load (100 users, ~75 req/s) | 176 ms | 55 ms |
 | All endpoints p99 under load (100 users) | 226 ms | 83 ms |
 | COUNT for `?status=CONTACTED` (EXPLAIN ANALYZE) | 13.2 ms | 1.0 ms |
 
 "Before" is commit `d399021` (Stage 2, the list endpoint written the straightforward way).
 "After" is `aaeb6b6`. Both fixes are described below. The p95 target was 150 ms. Before the
-fixes, the 100-user run was over it (176 ms). After, it is well under it (55 ms).
+fixes, the 100-user run was over it (176 ms). After, it was well under it (55 ms).
+
+**Current code (section 5), same 100-user test:**
+
+| What | `main` as merged (`de518ed`) | Now |
+|---|---:|---:|
+| All endpoints p95 / p99 | 99 ms / 145 ms | **50 ms / 76 ms** |
+| Inbox (`/api/conversations/`) p95 | 156 ms | 49 ms |
+| Deep prospect pages p95 | 65 ms | 38 ms |
+| Last prospect page, sequential p50 | 49.9 ms | 18.0 ms |
 
 ## Setup
 
@@ -208,9 +224,76 @@ request wait in the queue.
 - **Search:** a `pg_trgm` GIN index over the searched columns would turn the 27 ms filtered
   scan into an index lookup. Search is the slowest endpoint (p95 93 ms at 100 users), so it
   is the first thing to change if load or data grows.
-- **Deep pages:** keyset/cursor pagination on `(created_at, id)` would make any page cost
-  the same as page 1 and remove the COUNT. The trade-off is losing "jump to page N", so it
-  fits an infinite-scroll pipeline better than a paged table.
+- **Deep pages:** addressed in section 5 by paging over ids first and adding an index that
+  matches the sort. Keyset/cursor pagination would also remove the COUNT, at the cost of
+  "jump to page N".
+
+## 5. Follow-up (November 2026): deep pages, list index, and an inbox regression
+
+All measurements here were taken on the same 100K-prospect seed, the same machine and the same
+scripts as above. The demo data was regenerated after sections 1–4 (same size and generator,
+with timestamps no longer allowed in the future), so compare numbers within this section.
+
+**Deep prospect pages.** `EXPLAIN ANALYZE` of the last page (`?page=1000`) showed that, at large
+offsets, Postgres stopped using the `(organization, -created_at)` index. It ran a parallel
+sequential scan of the org's 25,000 rows, did a full sort on `(created_at, id)` (the index had
+no `id` tie-breaker), and joined agent and property for **all 25,000 rows** to return 25:
+43.5 ms.
+
+Two changes, measured one at a time:
+
+| Last page, `?page=1000` | DB time per request (p50) | Request p50 / p95 |
+|---|---:|---:|
+| `main` as merged | 38.7 ms | 49.9 / 73.3 ms |
+| A. Page over ids first, then load and join only that page's rows | 13.1 ms | 27.3 / 31.0 ms |
+| A + B. Replace the index with `(organization, -created_at, -id)` | **7.0 ms** | **18.0 / 22.0 ms** |
+
+- **A.** The id query touches `crm_prospect` alone; the joins and the tours prefetch run for
+  25 rows (page query 43.5 ms → 0.3 ms). This adds one query per request (5 → 6 over HTTP, 4
+  → 5 in tests), and page 1 did not get slower (p50 16.7 → 17.7 ms, within run-to-run noise).
+- **B.** With the id tie-breaker in the index, the id query became an Index Only Scan with no
+  sort step: 11.9 ms → 3.3 ms on the last page. The new index replaces the old one rather than
+  adding a second, so writes don't maintain an extra index.
+
+This idea came from an earlier experiment branch (`perf-benchmarks`, closed). It was
+re-implemented and re-measured here, so the numbers above belong to this code.
+
+**Inbox regression.** The probe showed the inbox at p50 87.1 ms with 75 ms of DB time. In
+sections 1–4 it was about 10 ms. The cause was the Stage 4 inbox annotation
+`Count("handoffs")`. Being an aggregate over a join, it made Postgres `GROUP BY` all 25,008 of
+the org's conversations, joined to prospects, *before* `ORDER BY ... LIMIT` picked the page.
+The paginator's COUNT inherited the same `GROUP BY`. The fix computes the open-handoff count as
+a correlated subquery, like the last-message columns, so nothing is grouped and the page comes
+straight off the `(organization, -last_message_at)` index:
+
+| Inbox | Page query | COUNT | Request p50 (sequential) |
+|---|---:|---:|---:|
+| `main` as merged | 90.8 ms | 17.3 ms | 87.1 ms |
+| Correlated subquery | **0.65 ms** | **2.1 ms** | **12.8 ms** |
+
+A test pins the zero-handoff case (`Coalesce` to 0). The inbox query-count test passed both
+before and after, because the problem was the cost of each query, not how many queries ran.
+
+**Load test, current code** (same Locust script and task mix as section 4, 100 users, 3 minutes):
+
+| Endpoint | `main` as merged p50 / p95 / p99 | Now p50 / p95 / p99 |
+|---|---:|---:|
+| `/api/conversations/` | 86 / 156 / 193 | 31 / 49 / 64 |
+| `/api/prospects/` | 22 / 58 / 96 | 23 / 38 / 56 |
+| `/api/prospects/?page=N` | 30 / 65 / 110 | 26 / 38 / 57 |
+| `/api/prospects/?q=` | 44 / 90 / 136 | 47 / 83 / 103 |
+| `/api/prospects/?status=` | 20 / 54 / 90 | 22 / 34 / 46 |
+| `/api/prospects/{id}/` | 21 / 53 / 88 | 21 / 34 / 49 |
+| `/api/tours/` | 23 / 59 / 99 | 23 / 38 / 50 |
+| `/api/units/` | 15 / 46 / 76 | 15 / 26 / 43 |
+| **All endpoints** | **24 / 99 / 145** (77.7 req/s) | **23 / 50 / 76** (78.4 req/s) |
+
+Both runs had 0 errors. At 50 users the current code measured p50 / p95 / p99 of
+22 / 41 / 66 ms at 39.7 req/s. In the merged run, the slow inbox also raised p95 on endpoints
+that didn't change, because all endpoints share the same 4 gunicorn workers.
+
+Search (`?q=`) is still the slowest endpoint. The `pg_trgm` option under "Not done yet" still
+applies.
 
 ## Reproduce
 
@@ -223,7 +306,7 @@ DJANGO_DEBUG=false gunicorn config.wsgi:application --bind 127.0.0.1:8000 --work
 python scripts/perf/probe.py --runs 30
 ```
 ```bash
-python manage.py perf_explain --query "status=CONTACTED"
+python manage.py perf_explain --query "status=CONTACTED"      # or --endpoint conversations
 ```
 ```bash
 python manage.py demo_tokens > /tmp/tokens.json

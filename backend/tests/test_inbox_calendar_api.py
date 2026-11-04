@@ -136,3 +136,18 @@ def test_tour_list_query_count_is_constant(manager_client, org, django_assert_nu
         )
     with django_assert_num_queries(3):
         manager_client.get("/api/tours/")
+
+
+def test_inbox_open_handoffs_is_zero_not_null(manager_client, org):
+    conv = ConversationFactory(prospect=ProspectFactory(organization=org))
+    add_message(conv, "hi")
+    HandoffTask.objects.create(
+        organization=org,
+        conversation=conv,
+        prospect=conv.prospect,
+        reason="OUT_OF_SCOPE",
+        question="q",
+        status="RESOLVED",
+    )
+    row = manager_client.get("/api/conversations/").data["results"][0]
+    assert row["open_handoffs"] == 0

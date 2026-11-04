@@ -1,0 +1,128 @@
+# main de518ed (before), org 1, 100K seed
+### prospects ?page=1
+--- query 2: SELECT COUNT(*) AS "__count" FROM "crm_prospect" WHERE "crm_prospect"."organization_id" = 21...
+Aggregate  (cost=792.63..792.64 rows=1 width=8) (actual time=4.036..4.037 rows=1 loops=1)
+  ->  Index Only Scan using crm_prospect_organization_id_7d94b6b0 on crm_prospect  (cost=0.29..730.51 rows=24849 width=0) (actual time=0.024..2.264 rows=25008 loops=1)
+        Index Cond: (organization_id = 21)
+        Heap Fetches: 3
+Planning Time: 0.141 ms
+Execution Time: 4.060 ms
+--- query 3: SELECT "crm_prospect"."id", "crm_prospect"."created_at", "crm_prospect"."updated_at", "crm_prospect"."organization_id", "crm_prospect"."first_name", "crm_prospe...
+Limit  (cost=0.72..26.83 rows=25 width=469) (actual time=0.039..0.098 rows=25 loops=1)
+  ->  Nested Loop Left Join  (cost=0.72..25961.62 rows=24849 width=469) (actual time=0.039..0.095 rows=25 loops=1)
+        ->  Nested Loop Left Join  (cost=0.57..25351.52 rows=24849 width=298) (actual time=0.030..0.069 rows=25 loops=1)
+              ->  Index Scan using prospect_org_created_id on crm_prospect  (cost=0.42..24732.92 rows=24849 width=150) (actual time=0.020..0.043 rows=25 loops=1)
+                    Index Cond: (organization_id = 21)
+              ->  Memoize  (cost=0.15..0.17 rows=1 width=148) (actual time=0.001..0.001 rows=1 loops=25)
+                    Cache Key: crm_prospect.assigned_agent_id
+                    Cache Mode: logical
+                    Hits: 19  Misses: 6  Evictions: 0  Overflows: 0  Memory Usage: 2kB
+                    ->  Index Scan using accounts_user_pkey on accounts_user  (cost=0.14..0.16 rows=1 width=148) (actual time=0.002..0.002 rows=1 loops=6)
+                          Index Cond: (id = crm_prospect.assigned_agent_id)
+        ->  Memoize  (cost=0.15..0.17 rows=1 width=171) (actual time=0.001..0.001 rows=1 loops=25)
+              Cache Key: crm_prospect.interested_property_id
+              Cache Mode: logical
+              Hits: 19  Misses: 6  Evictions: 0  Overflows: 0  Memory Usage: 2kB
+              ->  Index Scan using properties_property_pkey on properties_property  (cost=0.14..0.16 rows=1 width=171) (actual time=0.001..0.001 rows=1 loops=6)
+                    Index Cond: (id = crm_prospect.interested_property_id)
+Planning Time: 0.346 ms
+Execution Time: 0.166 ms
+### prospects ?page=1000
+--- query 2: SELECT COUNT(*) AS "__count" FROM "crm_prospect" WHERE "crm_prospect"."organization_id" = 21...
+Aggregate  (cost=792.63..792.64 rows=1 width=8) (actual time=3.571..3.571 rows=1 loops=1)
+  ->  Index Only Scan using crm_prospect_organization_id_7d94b6b0 on crm_prospect  (cost=0.29..730.51 rows=24849 width=0) (actual time=0.021..2.014 rows=25008 loops=1)
+        Index Cond: (organization_id = 21)
+        Heap Fetches: 3
+Planning Time: 0.096 ms
+Execution Time: 3.593 ms
+--- query 3: SELECT "crm_prospect"."id", "crm_prospect"."created_at", "crm_prospect"."updated_at", "crm_prospect"."organization_id", "crm_prospect"."first_name", "crm_prospe...
+Limit  (cost=11746.13..11746.27 rows=1 width=469) (actual time=40.689..43.394 rows=25 loops=1)
+  ->  Nested Loop Left Join  (cost=8242.10..11746.13 rows=24849 width=469) (actual time=19.128..42.412 rows=25000 loops=1)
+        ->  Gather Merge  (cost=8241.95..11136.03 rows=24849 width=298) (actual time=19.103..29.497 rows=25000 loops=1)
+              Workers Planned: 2
+              Workers Launched: 2
+              ->  Sort  (cost=7241.93..7267.81 rows=10354 width=298) (actual time=16.585..17.656 rows=8335 loops=3)
+                    Sort Key: crm_prospect.created_at DESC, crm_prospect.id DESC
+                    Sort Method: quicksort  Memory: 2267kB
+                    Worker 0:  Sort Method: quicksort  Memory: 2990kB
+                    Worker 1:  Sort Method: quicksort  Memory: 2955kB
+                    ->  Hash Left Join  (cost=1.81..6551.42 rows=10354 width=298) (actual time=1.319..10.427 rows=8336 loops=3)
+                          Hash Cond: (crm_prospect.assigned_agent_id = accounts_user.id)
+                          ->  Parallel Seq Scan on crm_prospect  (cost=0.00..6519.88 rows=10354 width=150) (actual time=1.184..8.125 rows=8336 loops=3)
+                                Filter: (organization_id = 21)
+                                Rows Removed by Filter: 25000
+                          ->  Hash  (cost=1.36..1.36 rows=36 width=148) (actual time=0.039..0.041 rows=36 loops=3)
+                                Buckets: 1024  Batches: 1  Memory Usage: 15kB
+                                ->  Seq Scan on accounts_user  (cost=0.00..1.36 rows=36 width=148) (actual time=0.024..0.027 rows=36 loops=3)
+        ->  Memoize  (cost=0.15..0.17 rows=1 width=171) (actual time=0.000..0.000 rows=1 loops=25000)
+              Cache Key: crm_prospect.interested_property_id
+              Cache Mode: logical
+              Hits: 24994  Misses: 6  Evictions: 0  Overflows: 0  Memory Usage: 2kB
+              ->  Index Scan using properties_property_pkey on properties_property  (cost=0.14..0.16 rows=1 width=171) (actual time=0.003..0.003 rows=1 loops=6)
+                    Index Cond: (id = crm_prospect.interested_property_id)
+Planning Time: 0.502 ms
+Execution Time: 43.488 ms
+### conversations ?
+--- query 2: SELECT COUNT(*) FROM (SELECT (SELECT U0."body" FROM "crm_message" U0 WHERE U0."conversation_id" = ("crm_conversation"."id") ORDER BY U0."sent_at" DESC LIMIT 1) ...
+Aggregate  (cost=3103.95..3103.96 rows=1 width=8) (actual time=17.225..17.229 rows=1 loops=1)
+  ->  HashAggregate  (cost=2544.37..2793.07 rows=24870 width=57) (actual time=12.297..15.712 rows=25008 loops=1)
+        Group Key: crm_conversation.id
+        Batches: 1  Memory Usage: 1809kB
+        ->  Hash Left Join  (cost=357.05..2482.20 rows=24870 width=8) (actual time=0.658..6.905 rows=25008 loops=1)
+              Hash Cond: (crm_conversation.id = crm_handofftask.conversation_id)
+              ->  Bitmap Heap Scan on crm_conversation  (cost=357.03..2388.91 rows=24870 width=8) (actual time=0.642..3.417 rows=25008 loops=1)
+                    Recheck Cond: (organization_id = 21)
+                    Heap Blocks: exact=290
+                    ->  Bitmap Index Scan on crm_conversation_organization_id_ae1d76be  (cost=0.00..350.82 rows=24870 width=0) (actual time=0.606..0.607 rows=25016 loops=1)
+                          Index Cond: (organization_id = 21)
+              ->  Hash  (cost=0.00..0.00 rows=1 width=8) (actual time=0.005..0.007 rows=0 loops=1)
+                    Buckets: 1024  Batches: 1  Memory Usage: 8kB
+                    ->  Seq Scan on crm_handofftask  (cost=0.00..0.00 rows=1 width=8) (actual time=0.004..0.005 rows=0 loops=1)
+Planning Time: 0.246 ms
+Execution Time: 17.313 ms
+--- query 3: SELECT "crm_conversation"."id", "crm_conversation"."created_at", "crm_conversation"."updated_at", "crm_conversation"."organization_id", "crm_conversation"."pros...
+Limit  (cost=13501.14..13906.15 rows=25 width=263) (actual time=90.053..90.638 rows=25 loops=1)
+  ->  Result  (cost=13501.14..416408.73 rows=24870 width=263) (actual time=90.052..90.633 rows=25 loops=1)
+        ->  Sort  (cost=13501.14..13563.32 rows=24870 width=214) (actual time=89.985..90.372 rows=25 loops=1)
+              Sort Key: crm_conversation.last_message_at DESC, crm_conversation.id DESC
+              Sort Method: top-N heapsort  Memory: 36kB
+              ->  Finalize HashAggregate  (cost=12550.63..12799.33 rows=24870 width=214) (actual time=66.868..77.993 rows=25008 loops=1)
+                    Group Key: crm_conversation.id, crm_prospect.id
+                    Batches: 1  Memory Usage: 7953kB
+                    ->  Gather  (cost=10219.18..12395.20 rows=20724 width=214) (actual time=37.142..45.073 rows=25008 loops=1)
+                          Workers Planned: 2
+                          Workers Launched: 2
+                          ->  Partial HashAggregate  (cost=9219.18..9322.80 rows=10362 width=214) (actual time=33.485..38.281 rows=8336 loops=3)
+                                Group Key: crm_conversation.id, crm_prospect.id
+                                Batches: 1  Memory Usage: 2961kB
+                                Worker 0:  Batches: 1  Memory Usage: 2705kB
+                                Worker 1:  Batches: 1  Memory Usage: 2961kB
+                                ->  Hash Left Join  (cost=2443.78..9115.56 rows=10362 width=252) (actual time=5.495..26.466 rows=8336 loops=3)
+                                      Hash Cond: (crm_conversation.id = crm_handofftask.conversation_id)
+                                      ->  Parallel Hash Join  (cost=2443.77..9076.68 rows=10362 width=206) (actual time=5.457..24.792 rows=8336 loops=3)
+                                            Hash Cond: (crm_prospect.id = crm_conversation.prospect_id)
+                                            ->  Parallel Seq Scan on crm_prospect  (cost=0.00..6415.70 rows=41670 width=150) (actual time=0.013..12.035 rows=33336 loops=3)
+                                            ->  Parallel Hash  (cost=2260.90..2260.90 rows=14629 width=56) (actual time=4.362..4.364 rows=8336 loops=3)
+                                                  Buckets: 32768  Batches: 1  Memory Usage: 2656kB
+                                                  ->  Parallel Bitmap Heap Scan on crm_conversation  (cost=357.03..2260.90 rows=14629 width=56) (actual time=0.243..1.767 rows=8336 loops=3)
+                                                        Recheck Cond: (organization_id = 21)
+                                                        Heap Blocks: exact=173
+                                                        ->  Bitmap Index Scan on crm_conversation_organization_id_ae1d76be  (cost=0.00..350.82 rows=24870 width=0) (actual time=0.608..0.608 rows=25016 loops=1)
+                                                              Index Cond: (organization_id = 21)
+                                      ->  Hash  (cost=0.00..0.00 rows=1 width=54) (actual time=0.016..0.017 rows=0 loops=3)
+                                            Buckets: 1024  Batches: 1  Memory Usage: 8kB
+                                            ->  Seq Scan on crm_handofftask  (cost=0.00..0.00 rows=1 width=54) (actual time=0.016..0.016 rows=0 loops=3)
+        SubPlan 1
+          ->  Limit  (cost=0.42..5.40 rows=1 width=60) (actual time=0.005..0.005 rows=1 loops=25)
+                ->  Index Scan Backward using message_conv_sent on crm_message u0  (cost=0.42..15.35 rows=3 width=60) (actual time=0.005..0.005 rows=1 loops=25)
+                      Index Cond: (conversation_id = crm_conversation.id)
+        SubPlan 2
+          ->  Limit  (cost=0.42..5.40 rows=1 width=11) (actual time=0.002..0.002 rows=1 loops=25)
+                ->  Index Scan Backward using message_conv_sent on crm_message u0_1  (cost=0.42..15.35 rows=3 width=11) (actual time=0.001..0.001 rows=1 loops=25)
+                      Index Cond: (conversation_id = crm_conversation.id)
+        SubPlan 3
+          ->  Limit  (cost=0.42..5.40 rows=1 width=9) (actual time=0.002..0.002 rows=1 loops=25)
+                ->  Index Scan Backward using message_conv_sent on crm_message u0_2  (cost=0.42..15.35 rows=3 width=9) (actual time=0.002..0.002 rows=1 loops=25)
+                      Index Cond: (conversation_id = crm_conversation.id)
+Planning Time: 0.640 ms
+Execution Time: 90.807 ms

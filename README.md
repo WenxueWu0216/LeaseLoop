@@ -117,11 +117,12 @@ The assistant uses a deterministic mock unless `LLM_PROVIDER=anthropic` and
 
 | Area | Result | Details |
 |---|---|---|
-| Backend tests (pytest-django) | 164 passing | models, tenancy (cross-tenant 404s), both roles, webhook idempotency, Celery retries and idempotency, assistant tools and guardrails, query counts |
+| Backend tests (pytest-django) | 166 passing | models, tenancy (cross-tenant 404s), both roles, webhook idempotency, Celery retries and idempotency, assistant tools and guardrails, query counts |
 | Frontend tests (Jest + RTL) | 15 passing | inbox, calendar (timezone, DST, optimistic update and rollback), availability grid |
 | End-to-end (Playwright) | 1 flow | webhook lead → inbox → tour → application → approval → signed lease |
 | Prospect list N+1 fix | 72 → 5 queries per page; p50 82.7 → 15.7 ms | [docs/perf.md](docs/perf.md) |
-| Load test, 100K prospects, 100 users (~75 req/s) | p95 across all endpoints 176 → **55 ms** (p99 83 ms) | [docs/perf.md](docs/perf.md) |
+| Load test, 100K prospects, 100 users (~78 req/s) | p95 across all endpoints **50 ms**, p99 76 ms, 0 errors | [docs/perf.md](docs/perf.md#5-follow-up-november-2026-deep-pages-list-index-and-an-inbox-regression) |
+| Deep pages and inbox (EXPLAIN-driven) | last-page DB time 38.7 → 7.0 ms; inbox page query 90.8 → 0.65 ms | [docs/perf.md](docs/perf.md#5-follow-up-november-2026-deep-pages-list-index-and-an-inbox-regression) |
 | Assistant eval, 150 inquiries, **mock provider** | 87.3% accuracy, **0 hallucinated prices**, handoff precision 0.92 / recall 0.95 | [evals/results.md](evals/results.md) |
 | Assistant eval, Claude | not run yet: needs an API key | `python evals/run_eval.py --provider anthropic` |
 

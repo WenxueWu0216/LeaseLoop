@@ -15,8 +15,9 @@ from .factories import (
 
 pytestmark = pytest.mark.django_db
 
-# membership + COUNT + page + upcoming-tours prefetch (force_authenticate skips the token lookup)
-LIST_QUERIES = 4
+# membership + COUNT + page of ids + those rows + upcoming-tours prefetch
+# (force_authenticate skips the token lookup)
+LIST_QUERIES = 5
 
 
 def make_prospects(org, agent, n):
@@ -47,3 +48,16 @@ def test_prospect_detail_query_count(manager_client, org, agent, django_assert_n
     with django_assert_num_queries(7):
         resp = manager_client.get(f"/api/prospects/{prospect_id}/")
     assert resp.data["next_tour"] and len(resp.data["tours"]) == 1
+
+
+def test_id_first_pages_keep_order_and_never_skip_or_repeat(manager_client, org, agent):
+    """Rows come back in the page's id order, and pages tile the full result set."""
+    make_prospects(org, agent, 7)
+    seen = []
+    for page in (1, 2, 3):
+        resp = manager_client.get(f"/api/prospects/?page_size=3&page={page}")
+        seen += [(r["created_at"], r["id"]) for r in resp.data["results"]]
+    assert len(seen) == len({i for _, i in seen}) == 7
+    assert seen == sorted(seen, reverse=True)  # -created_at, -id across page boundaries
+    oldest_first = manager_client.get("/api/prospects/?ordering=created_at&page_size=7")
+    assert [r["id"] for r in oldest_first.data["results"]] == [i for _, i in reversed(seen)]
