@@ -32,6 +32,8 @@ class WebhookView(APIView):
 
     authentication_classes: list = []
     permission_classes = [AllowAny]
+    # Authenticated by signature/secret; a 429 would drop a real lead's delivery.
+    throttle_classes: list = []
     parser_classes = [FormParser, MultiPartParser]
     provider: str
 

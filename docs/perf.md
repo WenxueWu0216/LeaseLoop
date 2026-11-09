@@ -211,8 +211,10 @@ request wait in the queue.
 - **Login is excluded on purpose.** In a first run where each simulated user logged in during
   ramp-up, 50 concurrent PBKDF2 password hashes took up all 4 workers. That pushed the
   aggregate p99 to 2.6 s even though steady-state endpoints were fine. The final runs reuse
-  the API tokens created by `seed_demo` (`manage.py demo_tokens`). Login cost is real, but
-  it happens once per session, not on every page.
+  pre-issued access tokens (`manage.py demo_tokens`). Login cost is real, but it happens
+  once per session, not on every page. Since the JWT change those tokens are 15-minute
+  access tokens, which covers a 3-minute run; and since rate limiting was added, logging
+  100 users in from one IP would be throttled anyway (`THROTTLE_LOGIN_IP_RATE`).
 - **Same-host load generator.** Locust, gunicorn and Postgres share 4 vCPUs, so these numbers
   are pessimistic compared with separate machines. They are also not production numbers:
   there is no network hop, and the database is local with default config.

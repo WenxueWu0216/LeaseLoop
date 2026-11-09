@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Navigate } from "react-router-dom";
 
+import { ApiError } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 
 export function LoginPage() {
@@ -21,8 +22,12 @@ export function LoginPage() {
           setError("");
           try {
             await login(email, password);
-          } catch {
-            setError("Email or password is incorrect.");
+          } catch (err) {
+            setError(
+              err instanceof ApiError && err.status === 429
+                ? "Too many sign-in attempts. Wait a minute and try again."
+                : "Email or password is incorrect.",
+            );
           } finally {
             setBusy(false);
           }

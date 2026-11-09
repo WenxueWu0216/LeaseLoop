@@ -112,7 +112,21 @@ REST_FRAMEWORK = {
     "DEFAULT_PAGINATION_CLASS": "apps.core.pagination.StandardPagination",
     "PAGE_SIZE": 25,
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
-    "DEFAULT_THROTTLE_RATES": {"assistant_chat": env("ASSISTANT_CHAT_RATE", "30/min")},
+    "DEFAULT_THROTTLE_CLASSES": [
+        "apps.core.throttling.AnonThrottle",
+        "apps.core.throttling.UserThrottle",
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": env("THROTTLE_ANON_RATE", "60/min"),
+        "user": env("THROTTLE_USER_RATE", "600/min"),
+        "login_ip": env("THROTTLE_LOGIN_IP_RATE", "5/min"),
+        "login_user": env("THROTTLE_LOGIN_USER_RATE", "5/min"),
+        "refresh_ip": env("THROTTLE_REFRESH_IP_RATE", "30/min"),
+        "assistant_chat": env("ASSISTANT_CHAT_RATE", "30/min"),
+    },
+    # Proxies in front of Django that append to X-Forwarded-For. 0 means use the TCP
+    # peer address; set it to 1 behind a single load balancer.
+    "NUM_PROXIES": int(env("NUM_PROXIES", "0")),
 }
 
 SIMPLE_JWT = {
@@ -145,6 +159,15 @@ SPECTACULAR_SETTINGS = {
 }
 
 REDIS_URL = env("REDIS_URL", "redis://localhost:6379/0")
+# Shared cache so rate-limit counters are global, not per gunicorn worker.
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": env("CACHE_URL", REDIS_URL),
+        "KEY_PREFIX": "leaseloop",
+        "TIMEOUT": 300,
+    }
+}
 CELERY_BROKER_URL = env("CELERY_BROKER_URL", REDIS_URL)
 CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", REDIS_URL)
 CELERY_TASK_ALWAYS_EAGER = env_bool("CELERY_TASK_ALWAYS_EAGER", False)
