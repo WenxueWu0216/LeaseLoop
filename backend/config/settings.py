@@ -1,4 +1,5 @@
 import os
+from datetime import timedelta
 from pathlib import Path
 
 from celery.schedules import crontab
@@ -27,7 +28,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "rest_framework",
-    "rest_framework.authtoken",
+    "rest_framework_simplejwt.token_blacklist",
     "django_filters",
     "drf_spectacular",
     "apps.core",
@@ -98,7 +99,8 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        "rest_framework.authentication.TokenAuthentication",
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+        # Sessions stay for the Django admin and the browsable Swagger UI.
         "rest_framework.authentication.SessionAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.IsAuthenticated"],
@@ -113,8 +115,22 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_RATES": {"assistant_chat": env("ASSISTANT_CHAT_RATE", "30/min")},
 }
 
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": True,
+    "UPDATE_LAST_LOGIN": True,
+    "AUTH_HEADER_TYPES": ("Bearer",),
+}
+JWT_REFRESH_COOKIE = "ll_refresh"
+# Off only for plain-http local development.
+JWT_REFRESH_COOKIE_SECURE = env_bool("JWT_REFRESH_COOKIE_SECURE", not DEBUG)
+
 SPECTACULAR_SETTINGS = {
     "TITLE": "LeaseLoop API",
+    # The schema maps every endpoint; only signed-in users (admin session or JWT) see it.
+    "SERVE_PERMISSIONS": ["rest_framework.permissions.IsAuthenticated"],
     "DESCRIPTION": "Multi-tenant apartment leasing CRM",
     "VERSION": "0.1.0",
     "ENUM_NAME_OVERRIDES": {

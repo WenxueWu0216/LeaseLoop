@@ -8,3 +8,5 @@ CELERY_TASK_EAGER_PROPAGATES = False
 CELERY_BROKER_URL = "memory://"
 CELERY_RESULT_BACKEND = "cache+memory://"
 PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
+# A full-length key, so JWT HMAC signing in tests uses a realistic key size.
+SECRET_KEY = "test-only-" + "k" * 54

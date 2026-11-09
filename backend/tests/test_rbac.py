@@ -191,8 +191,3 @@ def test_me_endpoint_lists_memberships(agent_client, org):
             "role": Membership.Role.LEASING_AGENT,
         }
     ]
-
-
-def test_token_login(client, agent):
-    resp = client.post("/api/auth/login/", {"username": agent.email, "password": "pass1234!"})
-    assert resp.status_code == 200 and resp.json()["token"]

@@ -1,48 +1,65 @@
 import { useQueryClient } from "@tanstack/react-query";
-import { createContext, useContext, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 
-import { api, session } from "../api/client";
+import { api, refreshAccess, session } from "../api/client";
 import { useMe } from "../api/hooks";
 import type { Me } from "../api/types";
+
+type Status = "checking" | "signed-out" | "signed-in";
 
 type Auth = {
   me: Me | undefined;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
 };
 
 const AuthContext = createContext<Auth | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const qc = useQueryClient();
-  const [token, setToken] = useState(session.token);
-  const me = useMe(Boolean(token));
+  const [status, setStatus] = useState<Status>("checking");
+  const me = useMe(status === "signed-in");
+
+  useEffect(() => {
+    // The access token doesn't survive a reload; the refresh cookie restores the session.
+    let live = true;
+    refreshAccess().then((ok) => live && setStatus(ok ? "signed-in" : "signed-out"));
+    const stop = session.onExpired(() => {
+      qc.clear();
+      setStatus("signed-out");
+    });
+    return () => {
+      live = false;
+      stop();
+    };
+  }, [qc]);
 
   async function login(email: string, password: string) {
-    const { token: t } = await api<{ token: string }>("/auth/login/", {
-      method: "POST", json: { username: email, password },
+    const { access } = await api<{ access: string }>("/auth/login/", {
+      method: "POST", json: { email, password },
     });
-    session.token = t;
+    session.access = access;
     const profile = await api<Me>("/auth/me/");
     // Users in several orgs work in their first one; the header picks it on every call.
     session.org = profile.memberships.length > 1 ? String(profile.memberships[0].organization.id) : null;
     qc.setQueryData(["me"], profile);
-    setToken(t);
+    setStatus("signed-in");
   }
 
-  function logout() {
-    session.token = null;
-    session.org = null;
-    qc.clear();
-    setToken(null);
+  async function logout() {
+    try {
+      await api("/auth/logout/", { method: "POST" }); // revokes the refresh token server-side
+    } finally {
+      session.access = null;
+      session.org = null;
+      qc.clear();
+      setStatus("signed-out");
+    }
   }
 
-  return (
-    <AuthContext.Provider value={{ me: me.data, loading: Boolean(token) && me.isLoading, login, logout }}>
-      {children}
-    </AuthContext.Provider>
-  );
+  const loading = status === "checking" || (status === "signed-in" && me.isLoading);
+  return <AuthContext.Provider value={{ me: me.data, loading, login, logout }}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth(): Auth {

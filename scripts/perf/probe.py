@@ -16,15 +16,15 @@ import urllib.request
 def login(base, email, password):
     req = urllib.request.Request(
         f"{base}/api/auth/login/",
-        data=json.dumps({"username": email, "password": password}).encode(),
+        data=json.dumps({"email": email, "password": password}).encode(),
         headers={"Content-Type": "application/json"},
     )
     with urllib.request.urlopen(req) as resp:
-        return json.load(resp)["token"]
+        return json.load(resp)["access"]
 
 
 def fetch(base, path, token):
-    req = urllib.request.Request(f"{base}{path}", headers={"Authorization": f"Token {token}"})
+    req = urllib.request.Request(f"{base}{path}", headers={"Authorization": f"Bearer {token}"})
     start = time.perf_counter()
     with urllib.request.urlopen(req) as resp:
         body = resp.read()

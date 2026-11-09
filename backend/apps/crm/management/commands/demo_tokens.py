@@ -1,12 +1,14 @@
 import json
 
 from django.core.management.base import BaseCommand
-from rest_framework.authtoken.models import Token
+from rest_framework_simplejwt.tokens import AccessToken
+
+from apps.accounts.models import User
 
 
 class Command(BaseCommand):
-    help = "Print API tokens of seed_demo users as JSON (for load tests)."
+    help = "Print short-lived (15 min) JWT access tokens for seed_demo users, for load tests."
 
     def handle(self, *args, **opts):
-        tokens = Token.objects.filter(user__email__endswith=".demo").select_related("user")
-        self.stdout.write(json.dumps({t.user.email: t.key for t in tokens}))
+        users = User.objects.filter(email__endswith=".demo")
+        self.stdout.write(json.dumps({u.email: str(AccessToken.for_user(u)) for u in users}))

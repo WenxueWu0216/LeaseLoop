@@ -10,7 +10,6 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.utils import timezone
 from faker import Faker
-from rest_framework.authtoken.models import Token
 
 from apps.accounts.models import Membership, Organization, User
 from apps.crm.models import Application, Channel, Conversation, Lease, Message, Prospect, Tour
@@ -170,7 +169,6 @@ class Command(BaseCommand):
         Membership.objects.create(
             user=manager, organization=org, role=Membership.Role.PROPERTY_MANAGER
         )
-        Token.objects.get_or_create(user=manager)
         agents = []
         for a in range(opts["agents_per_org"]):
             agent = User.objects.create(
@@ -180,7 +178,6 @@ class Command(BaseCommand):
                 last_name=fake.last_name(),
             )
             Membership.objects.create(user=agent, organization=org)
-            Token.objects.get_or_create(user=agent)
             agents.append(agent)
 
         properties = Property.objects.bulk_create(

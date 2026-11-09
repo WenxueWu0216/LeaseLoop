@@ -1,6 +1,5 @@
 from drf_spectacular.utils import extend_schema
 from rest_framework import mixins, viewsets
-from rest_framework.authtoken.views import ObtainAuthToken
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -10,10 +9,6 @@ from apps.core.viewsets import OrgScopedViewSetMixin
 
 from .models import Membership
 from .serializers import MembershipSerializer, MeSerializer
-
-
-class LoginView(ObtainAuthToken):
-    """POST {username: email, password} → {token}."""
 
 
 @extend_schema(responses=MeSerializer)
