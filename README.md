@@ -78,7 +78,16 @@ flowchart LR
 - **Observability.** Every request logs its query count, DB time, latency and request ID as
   JSON, and returns them in `Server-Timing` and `X-DB-Query-Count` headers. Slow or chatty
   requests log at WARNING.
-- **OpenAPI** schema at `/api/docs/`, validated in CI with warnings treated as errors.
+- **Security.** See [SECURITY.md](SECURITY.md) for the STRIDE threat model.
+  - JWT auth: 15-minute access tokens kept in memory; 7-day refresh tokens in an HttpOnly,
+    `SameSite=Strict` cookie, rotated on every use, with reuse rejected and logout revoking.
+  - Rate limits on login (per IP and per account), refresh and the whole API, shared
+    through Redis.
+  - Append-only audit log of prospect and lease changes and logins, readable by managers.
+  - CSP, HSTS and other security headers; a closed CORS policy; CSRF and `Origin` checks.
+  - CI gates: Semgrep, pip-audit and npm audit.
+- **OpenAPI** schema at `/api/docs/` (sign-in required), validated in CI with warnings
+  treated as errors.
 
 ## Screenshots
 
@@ -117,14 +126,15 @@ The assistant uses a deterministic mock unless `LLM_PROVIDER=anthropic` and
 
 | Area | Result | Details |
 |---|---|---|
-| Backend tests (pytest-django) | 166 passing | models, tenancy (cross-tenant 404s), both roles, webhook idempotency, Celery retries and idempotency, assistant tools and guardrails, query counts |
-| Frontend tests (Jest + RTL) | 15 passing | inbox, calendar (timezone, DST, optimistic update and rollback), availability grid |
+| Backend tests (pytest-django) | 216 passing | models, tenancy (cross-tenant 404s), both roles, webhook idempotency, Celery retries and idempotency, assistant tools and guardrails, query counts, JWT, rate limits, audit log, security headers |
+| Frontend tests (Jest + RTL) | 22 passing | inbox, calendar (timezone, DST, optimistic update and rollback), availability grid, token refresh on 401, login |
 | End-to-end (Playwright) | 1 flow | webhook lead → inbox → tour → application → approval → signed lease |
 | Prospect list N+1 fix | 72 → 5 queries per page; p50 82.7 → 15.7 ms | [docs/perf.md](docs/perf.md) |
 | Load test, 100K prospects, 100 users (~78 req/s) | p95 across all endpoints **50 ms**, p99 76 ms, 0 errors | [docs/perf.md](docs/perf.md#5-follow-up-november-2026-deep-pages-list-index-and-an-inbox-regression) |
 | Deep pages and inbox (EXPLAIN-driven) | last-page DB time 38.7 → 7.0 ms; inbox page query 90.8 → 0.65 ms | [docs/perf.md](docs/perf.md#5-follow-up-november-2026-deep-pages-list-index-and-an-inbox-regression) |
 | Assistant eval, 150 inquiries, **mock provider** | 87.3% accuracy, **0 hallucinated prices**, handoff precision 0.92 / recall 0.95 | [evals/results.md](evals/results.md) |
 | Assistant eval, Claude | not run yet: needs an API key | `python evals/run_eval.py --provider anthropic` |
+| Dependency scans | pip-audit 26 → 0 advisories; npm audit 30 → 4 (0 high, 4 accepted with reasons); Semgrep 0 findings | [SECURITY.md](SECURITY.md#dependency-and-static-analysis-results) |
 
 The mock-provider eval checks the pipeline, tools, guardrails and scoring. It doesn't measure
 model quality. The performance numbers were measured on a 4-vCPU container, with the load
@@ -165,6 +175,7 @@ The Playwright test expects the API and the Vite dev server to be running.
 
 CI (`.github/workflows/ci.yml`) runs on every push and pull request:
 
+- security: Semgrep, pip-audit and npm audit (fails on high severity);
 - lint: ruff, eslint and tsc;
 - backend tests against pgvector Postgres and Redis service containers;
 - the eval smoke test;
@@ -175,12 +186,13 @@ CI (`.github/workflows/ci.yml`) runs on every push and pull request:
 
 ```
 backend/
-  apps/core/          tenancy mixin, RBAC permissions, request-metrics middleware
-  apps/accounts/      users (email login), organizations, memberships
+  apps/core/          tenancy mixin, RBAC permissions, rate limits, request-metrics middleware
+  apps/accounts/      users, JWT login/refresh/logout, organizations, memberships
   apps/properties/    properties, units, policies
   apps/crm/           prospects, conversations, messages, tours, applications, leases
   apps/integrations/  webhooks, idempotency ledger, outbound messages, Celery jobs, ILS sync
   apps/assistant/     retrieval, tools, guardrails, providers, chat API
+  apps/audit/         append-only audit log and its read API
 frontend/             React app, Jest tests, Playwright e2e
 evals/                150-inquiry eval, fixture, runner, results
 docs/                 perf.md, assistant.md, integrations.md, screenshots
@@ -191,3 +203,4 @@ docs/                 perf.md, assistant.md, integrations.md, screenshots
 - [docs/perf.md](docs/perf.md): N+1 diagnosis, query plans, load-test method and results
 - [docs/assistant.md](docs/assistant.md): assistant design, handoff rules, eval history
 - [docs/integrations.md](docs/integrations.md): webhooks, idempotency, retries, a real-worker run
+- [SECURITY.md](SECURITY.md): threat model, controls mapped to code, scan results, known limitations
