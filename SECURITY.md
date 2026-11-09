@@ -127,6 +127,13 @@ chain and reported 22 before and 16 after.
 Semgrep's free rulesets did **not** flag `pickle.loads(request.body)` or `@csrf_exempt` in
 the planted file, so the scan complements code review rather than replacing it.
 
+## Performance cost
+
+A back-to-back load test against the version before this work (100 users, 100K
+prospects, 3 minutes each) showed the same p50 (22 ms) and p95 (47 ms), p99 73 → 76 ms
+and 0 errors in both runs. The test is read-only, so it doesn't include the audit insert
+on writes. Details: [docs/perf.md](docs/perf.md#6-cost-of-the-security-hardening-november-2026).
+
 ## Known limitations
 
 - **Refresh-token reuse doesn't revoke the whole session family.** If an attacker steals a
