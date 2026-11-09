@@ -10,6 +10,8 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
+from apps.audit import services as audit
+from apps.audit.models import AuditEvent
 from apps.core.permissions import IsManager
 from apps.core.viewsets import OrgScopedModelViewSet, OrgScopedViewSetMixin
 from apps.properties.models import Unit
@@ -18,7 +20,7 @@ from . import filters, models, serializers
 from .scoping import prospect_visibility, tour_visibility
 
 
-class ProspectViewSet(OrgScopedModelViewSet):
+class ProspectViewSet(audit.AuditedViewSetMixin, OrgScopedModelViewSet):
     queryset = models.Prospect.objects.order_by("-created_at", "-id")
     serializer_class = serializers.ProspectSerializer
     filterset_class = filters.ProspectFilter
@@ -249,23 +251,27 @@ class ApplicationViewSet(ProspectChildMixin, OrgScopedModelViewSet):
         data.is_valid(raise_exception=True)
         start = data.validated_data["start_date"]
         months = data.validated_data["term_months"]
-        lease = models.Lease.objects.create(
-            organization_id=app.organization_id,
-            application=app,
-            prospect=app.prospect,
-            unit=app.unit,
-            start_date=start,
-            term_months=months,
-            end_date=start + timedelta(days=round(months * 30.44)),
-            monthly_rent=app.unit.rent,
-        )
+        with transaction.atomic():
+            lease = models.Lease.objects.create(
+                organization_id=app.organization_id,
+                application=app,
+                prospect=app.prospect,
+                unit=app.unit,
+                start_date=start,
+                term_months=months,
+                end_date=start + timedelta(days=round(months * 30.44)),
+                monthly_rent=app.unit.rent,
+            )
+            audit.record_change(
+                request, AuditEvent.Action.CREATE, lease, audit.diff({}, audit.snapshot(lease))
+            )
         return Response(
             serializers.LeaseSerializer(lease, context=self.get_serializer_context()).data,
             status=201,
         )
 
 
-class LeaseViewSet(ProspectChildMixin, OrgScopedModelViewSet):
+class LeaseViewSet(ProspectChildMixin, audit.AuditedViewSetMixin, OrgScopedModelViewSet):
     queryset = models.Lease.objects.order_by("-created_at")
     serializer_class = serializers.LeaseSerializer
     filterset_class = filters.LeaseFilter
@@ -276,10 +282,17 @@ class LeaseViewSet(ProspectChildMixin, OrgScopedModelViewSet):
         lease = self.get_object()
         if lease.status not in (models.Lease.Status.DRAFT, models.Lease.Status.SENT):
             raise ValidationError({"status": "This lease is already signed."})
+        before = audit.snapshot(lease)
         with transaction.atomic():
             lease.status = models.Lease.Status.SIGNED
             lease.signed_at = timezone.now()
             lease.save(update_fields=["status", "signed_at", "updated_at"])
+            audit.record_change(
+                request,
+                AuditEvent.Action.UPDATE,
+                lease,
+                audit.diff(before, audit.snapshot(lease)),
+            )
             models.Prospect.objects.filter(pk=lease.prospect_id).update(
                 status=models.Prospect.Status.LEASED
             )

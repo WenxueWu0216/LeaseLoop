@@ -12,6 +12,7 @@ from contextlib import suppress
 from django.conf import settings
 from drf_spectacular.utils import extend_schema, inline_serializer
 from rest_framework import serializers, status
+from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -19,6 +20,7 @@ from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer, TokenRefreshSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from apps.audit.services import record_login
 from apps.core.throttling import (
     AnonThrottle,
     LoginIPThrottle,
@@ -69,7 +71,12 @@ class LoginView(AuthView):
     @extend_schema(request=TokenObtainPairSerializer, responses=AccessResponse)
     def post(self, request):
         serializer = TokenObtainPairSerializer(data=request.data, context={"request": request})
-        serializer.is_valid(raise_exception=True)  # wrong credentials -> 401
+        try:
+            serializer.is_valid(raise_exception=True)
+        except AuthenticationFailed:  # wrong password, unknown or inactive account -> 401
+            record_login(request, success=False, email=str(request.data.get("email", "")))
+            raise
+        record_login(request, success=True, email=serializer.user.email, user=serializer.user)
         response = Response({"access": serializer.validated_data["access"]})
         set_refresh_cookie(response, serializer.validated_data["refresh"])
         return response

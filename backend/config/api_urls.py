@@ -3,6 +3,7 @@ from rest_framework.routers import DefaultRouter
 
 from apps.accounts.auth import LoginView, LogoutView, RefreshView
 from apps.accounts.views import MembershipViewSet, me
+from apps.audit.views import AuditEventViewSet
 from apps.crm import views as crm
 from apps.properties import views as props
 
@@ -18,6 +19,7 @@ router.register("applications", crm.ApplicationViewSet, basename="application")
 router.register("leases", crm.LeaseViewSet, basename="lease")
 router.register("renewals", crm.RenewalViewSet, basename="renewal")
 router.register("handoffs", crm.HandoffTaskViewSet, basename="handoff")
+router.register("audit-events", AuditEventViewSet, basename="audit-event")
 
 urlpatterns = [
     path("auth/login/", LoginView.as_view(), name="login"),
