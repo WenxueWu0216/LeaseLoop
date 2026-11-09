@@ -3,6 +3,8 @@ from datetime import timedelta
 from pathlib import Path
 
 from celery.schedules import crontab
+from csp.constants import NONE, SELF
+from django.core.exceptions import ImproperlyConfigured
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -15,8 +17,17 @@ def env_bool(name: str, default: bool = False) -> bool:
     return env(name, str(default)).lower() in {"1", "true", "yes", "on"}
 
 
-SECRET_KEY = env("DJANGO_SECRET_KEY", "dev-insecure-change-me")
+DEV_SECRET_KEY = "dev-insecure-change-me"
+SECRET_KEY = env("DJANGO_SECRET_KEY", DEV_SECRET_KEY)
 DEBUG = env_bool("DJANGO_DEBUG", False)
+# The key signs sessions, password-reset links and JWTs: a guessable one lets anyone
+# forge a login. Refuse to run without a real one outside DEBUG.
+if not DEBUG and (
+    SECRET_KEY in {DEV_SECRET_KEY, "change-me"} or len(SECRET_KEY) < 50 or len(set(SECRET_KEY)) < 5
+):
+    raise ImproperlyConfigured(
+        "DJANGO_SECRET_KEY must be a random value of at least 50 characters when DEBUG is off."
+    )
 ALLOWED_HOSTS = [h for h in env("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",") if h]
 CSRF_TRUSTED_ORIGINS = [o for o in env("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(",") if o]
 
@@ -30,6 +41,8 @@ INSTALLED_APPS = [
     "rest_framework",
     "rest_framework_simplejwt.token_blacklist",
     "django_filters",
+    "corsheaders",
+    "csp",
     "drf_spectacular",
     "apps.core",
     "apps.accounts",
@@ -43,6 +56,8 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "apps.core.middleware.RequestMetricsMiddleware",
     "django.middleware.security.SecurityMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
+    "csp.middleware.CSPMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -229,3 +244,50 @@ LOGGING = {
         },
     },
 }
+
+# --- Transport and browser security ------------------------------------------------------
+# Production values are the default whenever DEBUG is off; each can be overridden.
+
+# HTTPS only. Behind a TLS-terminating proxy set TRUST_X_FORWARDED_PROTO=true, or Django
+# sees plain HTTP and redirects forever.
+SECURE_SSL_REDIRECT = env_bool("SECURE_SSL_REDIRECT", not DEBUG)
+if env_bool("TRUST_X_FORWARDED_PROTO", False):
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+# HSTS: browsers refuse plain HTTP to this host for a year (sent on HTTPS responses only).
+# Preload is opt-in because leaving the preload list takes months.
+SECURE_HSTS_SECONDS = int(env("SECURE_HSTS_SECONDS", "0" if DEBUG else "31536000"))
+SECURE_HSTS_INCLUDE_SUBDOMAINS = env_bool("SECURE_HSTS_INCLUDE_SUBDOMAINS", True)
+SECURE_HSTS_PRELOAD = env_bool("SECURE_HSTS_PRELOAD", False)
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = "same-origin"
+SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin"
+X_FRAME_OPTIONS = "DENY"
+
+# Session and CSRF cookies are used by /admin and the API docs only.
+SESSION_COOKIE_SECURE = env_bool("SESSION_COOKIE_SECURE", not DEBUG)
+CSRF_COOKIE_SECURE = env_bool("CSRF_COOKIE_SECURE", not DEBUG)
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = "Lax"
+CSRF_COOKIE_SAMESITE = "Lax"
+
+# CSP for everything Django renders (JSON, admin, API docs): only same-origin resources,
+# no plugins, no framing, no <base> rewriting. The docs view widens it for its CDN assets.
+CONTENT_SECURITY_POLICY = {
+    "DIRECTIVES": {
+        "default-src": [SELF],
+        "script-src": [SELF],
+        "style-src": [SELF],
+        "img-src": [SELF, "data:"],
+        "connect-src": [SELF],
+        "object-src": [NONE],
+        "base-uri": [NONE],
+        "frame-ancestors": [NONE],
+        "form-action": [SELF],
+    }
+}
+
+# CORS: the SPA is served same-origin (through a proxy), so no other origin may read API
+# responses unless listed here. Credentials (cookies) are never shared cross-origin.
+CORS_ALLOWED_ORIGINS = [o for o in env("CORS_ALLOWED_ORIGINS", "").split(",") if o]
+CORS_ALLOW_CREDENTIALS = False
+CORS_URLS_REGEX = r"^/api/.*$"

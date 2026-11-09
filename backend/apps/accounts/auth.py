@@ -13,7 +13,8 @@ from django.conf import settings
 from drf_spectacular.utils import extend_schema, inline_serializer
 from rest_framework import serializers, status
 from rest_framework.exceptions import AuthenticationFailed
-from rest_framework.permissions import AllowAny
+from rest_framework.parsers import JSONParser
+from rest_framework.permissions import BasePermission
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
@@ -53,9 +54,31 @@ def refresh_token_from(request) -> str | None:
     return request.COOKIES.get(settings.JWT_REFRESH_COOKIE) or request.data.get("refresh")
 
 
+class TrustedOrigin(BasePermission):
+    """CSRF defence for endpoints that act on the refresh cookie.
+
+    SameSite=Strict keeps other *sites* from sending the cookie, but a sibling
+    subdomain counts as the same site. Browsers send Origin on every POST, so a POST
+    from any origin other than ours (or CSRF_TRUSTED_ORIGINS) is refused. Requests
+    without Origin come from non-browser clients, which carry no ambient cookies.
+    """
+
+    message = "Origin not allowed."
+
+    def has_permission(self, request, view) -> bool:
+        origin = request.headers.get("Origin")
+        if origin is None:
+            return True
+        own = f"{request.scheme}://{request.get_host()}"
+        return origin == own or origin in settings.CSRF_TRUSTED_ORIGINS
+
+
 class AuthView(APIView):
     authentication_classes: list = []
-    permission_classes = [AllowAny]
+    permission_classes = [TrustedOrigin]
+    # JSON only: an HTML form can't send it, and a cross-origin fetch sending it needs a
+    # CORS preflight, which is refused for origins not on the allowlist.
+    parser_classes = [JSONParser]
 
     def get_authenticate_header(self, request):
         # Makes DRF answer token/credential failures with 401 + WWW-Authenticate, not 403.

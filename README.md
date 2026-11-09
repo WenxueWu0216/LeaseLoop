@@ -136,6 +136,9 @@ generator on the same machine. See each linked page for the setup and caveats.
 cd backend && python3.12 -m venv .venv && .venv/bin/pip install -r requirements-dev.txt
 ```
 ```bash
+export DJANGO_DEBUG=true   # with DEBUG off, settings require a real DJANGO_SECRET_KEY
+```
+```bash
 .venv/bin/python manage.py migrate && .venv/bin/python manage.py seed_demo --prospects 2000
 ```
 ```bash

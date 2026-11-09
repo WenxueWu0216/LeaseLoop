@@ -75,6 +75,8 @@ jobs:
           cache-dependency-path: backend/requirements-dev.txt
       - run: pip install -r requirements-dev.txt
       - name: Migrations are in sync
+        env:
+          DJANGO_DEBUG: "true"
         run: python manage.py makemigrations --check --dry-run
       - name: pytest
         run: pytest --create-db -p no:cacheprovider
@@ -147,6 +149,12 @@ jobs:
       SENDGRID_INBOUND_TOKEN: e2e-token
       CELERY_TASK_ALWAYS_EAGER: "true"
       DJANGO_DEBUG: "false"
+      # Production settings, minus the HTTPS redirect: the stack is served over plain
+      # HTTP on 127.0.0.1 here.
+      SECURE_SSL_REDIRECT: "false"
+      # The Vite proxy rewrites Host, so the browser origin must be listed for the
+      # Origin check on the auth endpoints (and Django's CSRF check).
+      DJANGO_CSRF_TRUSTED_ORIGINS: http://127.0.0.1:5173
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -155,6 +163,8 @@ jobs:
           cache: pip
           cache-dependency-path: backend/requirements-dev.txt
       - run: pip install -r backend/requirements-dev.txt
+      - name: Throwaway secret key for this run
+        run: echo "DJANGO_SECRET_KEY=$(python -c 'import secrets; print(secrets.token_urlsafe(50))')" >> "$GITHUB_ENV"
       - name: Database and demo data
         working-directory: backend
         run: |
