@@ -2,6 +2,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from django.core.cache import cache
 from rest_framework.test import APIClient
 
 from apps.accounts.models import Membership
@@ -10,6 +11,14 @@ from .factories import MembershipFactory, OrganizationFactory
 
 # Make the repo-level evals package (shared eval fixture) importable.
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+
+@pytest.fixture(autouse=True)
+def _clear_cache():
+    """Throttle counters live in the cache; start every test with a fresh budget."""
+    cache.clear()
+    yield
+    cache.clear()
 
 
 @pytest.fixture

@@ -17,9 +17,35 @@ env:
   POSTGRES_PASSWORD: leaseloop
   POSTGRES_HOST: localhost
   REDIS_URL: redis://localhost:6379/0
-  DJANGO_SECRET_KEY: ci-not-secret
 
 jobs:
+  security:
+    # Fails the build on: Semgrep ERROR/WARNING findings (WARNING includes SQL
+    # injection), any known-vulnerable Python package (the PyPI advisory feed has no
+    # severity, so accepted ones must be listed with --ignore-vuln and a reason), and
+    # high/critical npm advisories.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: pip install semgrep==1.184.0 pip-audit==2.10.1
+      - name: Semgrep (python + django rulesets)
+        run: >-
+          semgrep scan --config p/python --config p/django --metrics=off
+          --error --severity ERROR --severity WARNING backend scripts evals
+      - name: pip-audit
+        run: >-
+          pip-audit -r backend/requirements.txt -r backend/requirements-dev.txt
+          --progress-spinner off
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: npm audit (high and critical)
+        working-directory: frontend
+        run: npm audit --audit-level=high
+
   lint:
     runs-on: ubuntu-latest
     steps:
@@ -75,6 +101,8 @@ jobs:
           cache-dependency-path: backend/requirements-dev.txt
       - run: pip install -r requirements-dev.txt
       - name: Migrations are in sync
+        env:
+          DJANGO_DEBUG: "true"
         run: python manage.py makemigrations --check --dry-run
       - name: pytest
         run: pytest --create-db -p no:cacheprovider
@@ -147,6 +175,12 @@ jobs:
       SENDGRID_INBOUND_TOKEN: e2e-token
       CELERY_TASK_ALWAYS_EAGER: "true"
       DJANGO_DEBUG: "false"
+      # Production settings, minus the HTTPS redirect: the stack is served over plain
+      # HTTP on 127.0.0.1 here.
+      SECURE_SSL_REDIRECT: "false"
+      # The Vite proxy rewrites Host, so the browser origin must be listed for the
+      # Origin check on the auth endpoints (and Django's CSRF check).
+      DJANGO_CSRF_TRUSTED_ORIGINS: http://127.0.0.1:5173
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -155,6 +189,8 @@ jobs:
           cache: pip
           cache-dependency-path: backend/requirements-dev.txt
       - run: pip install -r backend/requirements-dev.txt
+      - name: Throwaway secret key for this run
+        run: echo "DJANGO_SECRET_KEY=$(python -c 'import secrets; print(secrets.token_urlsafe(50))')" >> "$GITHUB_ENV"
       - name: Database and demo data
         working-directory: backend
         run: |

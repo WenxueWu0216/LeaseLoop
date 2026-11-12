@@ -6,8 +6,9 @@
         --headless -u 50 -r 25 -t 3m --reset-stats
 
 Each simulated user acts as a random manager or agent from the demo orgs. With
-LOCUST_TOKENS set, users reuse existing API tokens instead of logging in, so the
-password hashing of 50+ simultaneous logins doesn't pollute steady-state numbers.
+LOCUST_TOKENS set, users reuse pre-issued JWT access tokens (valid 15 minutes) instead
+of logging in, so the password hashing of 50+ simultaneous logins doesn't pollute
+steady-state numbers.
 LOCUST_RAW_CSV records every request so percentiles can be recomputed exactly.
 """
 
@@ -73,11 +74,11 @@ class LeasingAgent(HttpUser):
         else:
             resp = self.client.post(
                 "/api/auth/login/",
-                json={"username": email, "password": PASSWORD},
+                json={"email": email, "password": PASSWORD},
                 name="setup: login",
             )
-            token = resp.json()["token"]
-        self.client.headers["Authorization"] = f"Token {token}"
+            token = resp.json()["access"]
+        self.client.headers["Authorization"] = f"Bearer {token}"
         page = self.client.get("/api/prospects/?page_size=100", name="setup: prospect ids")
         self.prospect_ids = [r["id"] for r in page.json()["results"]] or [0]
 

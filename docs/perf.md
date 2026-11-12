@@ -211,8 +211,10 @@ request wait in the queue.
 - **Login is excluded on purpose.** In a first run where each simulated user logged in during
   ramp-up, 50 concurrent PBKDF2 password hashes took up all 4 workers. That pushed the
   aggregate p99 to 2.6 s even though steady-state endpoints were fine. The final runs reuse
-  the API tokens created by `seed_demo` (`manage.py demo_tokens`). Login cost is real, but
-  it happens once per session, not on every page.
+  pre-issued access tokens (`manage.py demo_tokens`). Login cost is real, but it happens
+  once per session, not on every page. Since the JWT change those tokens are 15-minute
+  access tokens, which covers a 3-minute run; and since rate limiting was added, logging
+  100 users in from one IP would be throttled anyway (`THROTTLE_LOGIN_IP_RATE`).
 - **Same-host load generator.** Locust, gunicorn and Postgres share 4 vCPUs, so these numbers
   are pessimistic compared with separate machines. They are also not production numbers:
   there is no network hop, and the database is local with default config.
@@ -320,3 +322,29 @@ python scripts/perf/summarize.py /tmp/raw.csv
 ```
 
 To measure the "before" state, check out `d399021` and repeat the same steps.
+
+## 6. Cost of the security hardening (November 2026)
+
+The security work added a Redis rate-limit check to every request, JWT verification, CSP
+and CORS middleware, and an audit insert on every prospect or lease write. To measure the
+cost, `main` before the change (`ad85d99`, Django 5.1.4, DRF 3.15.2) and the hardened
+branch (Django 5.2.17, DRF 3.18.2) ran back to back on the same machine and the same
+100K-prospect data: gunicorn with 4 workers, 100 Locust users, 3 minutes each, with
+pre-issued tokens.
+
+The per-user limit was raised to 100000/min for the hardened run because several
+simulated users share one demo account. The throttle still ran its Redis check on every
+request; it just never rejected one.
+
+| All endpoints | `main` (before) | hardened |
+|---|---:|---:|
+| Requests | 12,868 | 12,903 |
+| Errors | 0 | 0 |
+| p50 | 22 ms | 22 ms |
+| p95 | 47 ms | 47 ms |
+| p99 | 73 ms | 76 ms |
+| Throughput | 78.4 req/s | 78.3 req/s |
+
+No endpoint's p95 moved by more than 2 ms. The 3 ms p99 difference is within the spread
+seen between repeated runs of the same build, so the overhead isn't measurable at this load.
+The load test is read-only, so it doesn't include the audit insert on writes.
