@@ -1,6 +1,8 @@
 from django.conf import settings
+from django.contrib.postgres.indexes import GinIndex, OpClass
 from django.db import models
 from django.db.models import F, Q
+from django.db.models.functions import Upper
 
 from apps.core.models import OrgOwnedModel
 
@@ -86,6 +88,18 @@ class Prospect(OrgOwnedModel):
             ),
             models.Index(fields=["organization", "email"], name="prospect_org_email"),
             models.Index(fields=["organization", "phone"], name="prospect_org_phone"),
+            # Trigram indexes for the ?q= search. Django compiles icontains to
+            # UPPER(col::text) LIKE UPPER(%s), so each index is on UPPER(col) to match it;
+            # an index on the bare column would be ignored. Terms under 3 characters have
+            # no trigrams and still scan the org's rows.
+            GinIndex(
+                OpClass(Upper("first_name"), name="gin_trgm_ops"), name="prospect_first_name_trgm"
+            ),
+            GinIndex(
+                OpClass(Upper("last_name"), name="gin_trgm_ops"), name="prospect_last_name_trgm"
+            ),
+            GinIndex(OpClass(Upper("email"), name="gin_trgm_ops"), name="prospect_email_trgm"),
+            GinIndex(OpClass(Upper("phone"), name="gin_trgm_ops"), name="prospect_phone_trgm"),
         ]
 
     @property

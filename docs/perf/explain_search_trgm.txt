@@ -1,0 +1,346 @@
+PostgreSQL 16.15 (Ubuntu 16.15-0ubuntu0.24.04.1) on x86_64-pc-linux-gnu, compiled by gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0, 64-bit
+
+===== B-tree indexes only (current main) =====
+
+-- q='smith': 459 matches; COUNT plan:
+Aggregate  (cost=2580.85..2580.86 rows=1 width=8) (actual time=22.495..22.497 rows=1 loops=1)
+  Buffers: shared hit=1507
+  ->  Bitmap Heap Scan on prospect  (cost=275.10..2580.45 rows=159 width=0) (actual time=0.688..22.455 rows=459 loops=1)
+        Recheck Cond: (organization_id = 1)
+        Filter: ((upper((first_name)::text) ~~ '%SMITH%'::text) OR (upper((last_name)::text) ~~ '%SMITH%'::text) OR (upper((email)::text) ~~ '%SMITH%'::text) OR (upper((phone)::text) ~~ '%SMITH%'::text))
+        Rows Removed by Filter: 24541
+        Heap Blocks: exact=1484
+        Buffers: shared hit=1507
+        ->  Bitmap Index Scan on p_org  (cost=0.00..275.06 rows=24903 width=0) (actual time=0.489..0.490 rows=25000 loops=1)
+              Index Cond: (organization_id = 1)
+              Buffers: shared hit=23
+Planning Time: 0.070 ms
+Execution Time: 22.519 ms
+-- q='smith': page plan:
+Limit  (cost=0.42..1136.17 rows=25 width=16) (actual time=0.086..1.505 rows=25 loops=1)
+  Buffers: shared hit=1127
+  ->  Index Scan using p_org_created_id on prospect  (cost=0.42..7223.81 rows=159 width=16) (actual time=0.085..1.502 rows=25 loops=1)
+        Index Cond: (organization_id = 1)
+        Filter: ((upper((first_name)::text) ~~ '%SMITH%'::text) OR (upper((last_name)::text) ~~ '%SMITH%'::text) OR (upper((email)::text) ~~ '%SMITH%'::text) OR (upper((phone)::text) ~~ '%SMITH%'::text))
+        Rows Removed by Filter: 1095
+        Buffers: shared hit=1127
+Planning Time: 0.097 ms
+Execution Time: 1.520 ms
+
+-- q='john': 904 matches; COUNT plan:
+Aggregate  (cost=2582.58..2582.59 rows=1 width=8) (actual time=23.242..23.244 rows=1 loops=1)
+  Buffers: shared hit=1507
+  ->  Bitmap Heap Scan on prospect  (cost=275.26..2580.61 rows=787 width=0) (actual time=0.782..23.179 rows=904 loops=1)
+        Recheck Cond: (organization_id = 1)
+        Filter: ((upper((first_name)::text) ~~ '%JOHN%'::text) OR (upper((last_name)::text) ~~ '%JOHN%'::text) OR (upper((email)::text) ~~ '%JOHN%'::text) OR (upper((phone)::text) ~~ '%JOHN%'::text))
+        Rows Removed by Filter: 24096
+        Heap Blocks: exact=1484
+        Buffers: shared hit=1507
+        ->  Bitmap Index Scan on p_org  (cost=0.00..275.06 rows=24903 width=0) (actual time=0.481..0.482 rows=25000 loops=1)
+              Index Cond: (organization_id = 1)
+              Buffers: shared hit=23
+Planning Time: 0.063 ms
+Execution Time: 23.267 ms
+-- q='john': page plan:
+Limit  (cost=0.42..229.88 rows=25 width=16) (actual time=0.022..0.544 rows=25 loops=1)
+  Buffers: shared hit=374
+  ->  Index Scan using p_org_created_id on prospect  (cost=0.42..7223.81 rows=787 width=16) (actual time=0.022..0.541 rows=25 loops=1)
+        Index Cond: (organization_id = 1)
+        Filter: ((upper((first_name)::text) ~~ '%JOHN%'::text) OR (upper((last_name)::text) ~~ '%JOHN%'::text) OR (upper((email)::text) ~~ '%JOHN%'::text) OR (upper((phone)::text) ~~ '%JOHN%'::text))
+        Rows Removed by Filter: 346
+        Buffers: shared hit=374
+Planning Time: 0.102 ms
+Execution Time: 0.557 ms
+
+-- q='example.com': 25000 matches; COUNT plan:
+Aggregate  (cost=2580.44..2580.45 rows=1 width=8) (actual time=25.864..25.866 rows=1 loops=1)
+  Buffers: shared hit=1507
+  ->  Bitmap Heap Scan on prospect  (cost=275.07..2580.41 rows=10 width=0) (actual time=0.827..24.523 rows=25000 loops=1)
+        Recheck Cond: (organization_id = 1)
+        Filter: ((upper((first_name)::text) ~~ '%EXAMPLE.COM%'::text) OR (upper((last_name)::text) ~~ '%EXAMPLE.COM%'::text) OR (upper((email)::text) ~~ '%EXAMPLE.COM%'::text) OR (upper((phone)::text) ~~ '%EXAMPLE.COM%'::text))
+        Heap Blocks: exact=1484
+        Buffers: shared hit=1507
+        ->  Bitmap Index Scan on p_org  (cost=0.00..275.06 rows=24903 width=0) (actual time=0.558..0.559 rows=25000 loops=1)
+              Index Cond: (organization_id = 1)
+              Buffers: shared hit=23
+Planning Time: 0.148 ms
+Execution Time: 25.903 ms
+-- q='example.com': page plan:
+Limit  (cost=2580.58..2580.61 rows=10 width=16) (actual time=27.889..27.894 rows=25 loops=1)
+  Buffers: shared hit=1507
+  ->  Sort  (cost=2580.58..2580.61 rows=10 width=16) (actual time=27.887..27.889 rows=25 loops=1)
+        Sort Key: created_at DESC, id DESC
+        Sort Method: top-N heapsort  Memory: 26kB
+        Buffers: shared hit=1507
+        ->  Bitmap Heap Scan on prospect  (cost=275.07..2580.41 rows=10 width=16) (actual time=0.675..25.332 rows=25000 loops=1)
+              Recheck Cond: (organization_id = 1)
+              Filter: ((upper((first_name)::text) ~~ '%EXAMPLE.COM%'::text) OR (upper((last_name)::text) ~~ '%EXAMPLE.COM%'::text) OR (upper((email)::text) ~~ '%EXAMPLE.COM%'::text) OR (upper((phone)::text) ~~ '%EXAMPLE.COM%'::text))
+              Heap Blocks: exact=1484
+              Buffers: shared hit=1507
+              ->  Bitmap Index Scan on p_org  (cost=0.00..275.06 rows=24903 width=0) (actual time=0.438..0.438 rows=25000 loops=1)
+                    Index Cond: (organization_id = 1)
+                    Buffers: shared hit=23
+Planning Time: 0.157 ms
+Execution Time: 27.922 ms
+
+-- q='201555': 0 matches; COUNT plan:
+Aggregate  (cost=2580.50..2580.51 rows=1 width=8) (actual time=22.171..22.173 rows=1 loops=1)
+  Buffers: shared hit=1507
+  ->  Bitmap Heap Scan on prospect  (cost=275.07..2580.42 rows=32 width=0) (actual time=22.166..22.167 rows=0 loops=1)
+        Recheck Cond: (organization_id = 1)
+        Filter: ((upper((first_name)::text) ~~ '%201555%'::text) OR (upper((last_name)::text) ~~ '%201555%'::text) OR (upper((email)::text) ~~ '%201555%'::text) OR (upper((phone)::text) ~~ '%201555%'::text))
+        Rows Removed by Filter: 25000
+        Heap Blocks: exact=1484
+        Buffers: shared hit=1507
+        ->  Bitmap Index Scan on p_org  (cost=0.00..275.06 rows=24903 width=0) (actual time=0.427..0.427 rows=25000 loops=1)
+              Index Cond: (organization_id = 1)
+              Buffers: shared hit=23
+Planning Time: 0.108 ms
+Execution Time: 22.198 ms
+-- q='201555': page plan:
+Limit  (cost=2581.22..2581.28 rows=25 width=16) (actual time=24.133..24.135 rows=0 loops=1)
+  Buffers: shared hit=1507
+  ->  Sort  (cost=2581.22..2581.30 rows=32 width=16) (actual time=24.131..24.133 rows=0 loops=1)
+        Sort Key: created_at DESC, id DESC
+        Sort Method: quicksort  Memory: 25kB
+        Buffers: shared hit=1507
+        ->  Bitmap Heap Scan on prospect  (cost=275.07..2580.42 rows=32 width=16) (actual time=24.126..24.127 rows=0 loops=1)
+              Recheck Cond: (organization_id = 1)
+              Filter: ((upper((first_name)::text) ~~ '%201555%'::text) OR (upper((last_name)::text) ~~ '%201555%'::text) OR (upper((email)::text) ~~ '%201555%'::text) OR (upper((phone)::text) ~~ '%201555%'::text))
+              Rows Removed by Filter: 25000
+              Heap Blocks: exact=1484
+              Buffers: shared hit=1507
+              ->  Bitmap Index Scan on p_org  (cost=0.00..275.06 rows=24903 width=0) (actual time=0.481..0.482 rows=25000 loops=1)
+                    Index Cond: (organization_id = 1)
+                    Buffers: shared hit=23
+Planning Time: 0.120 ms
+Execution Time: 24.162 ms
+
+-- q='zz': 0 matches; COUNT plan:
+Aggregate  (cost=2620.85..2620.86 rows=1 width=8) (actual time=36.138..36.140 rows=1 loops=1)
+  Buffers: shared hit=1507
+  ->  Bitmap Heap Scan on prospect  (cost=278.74..2584.09 rows=14703 width=0) (actual time=36.131..36.132 rows=0 loops=1)
+        Recheck Cond: (organization_id = 1)
+        Filter: ((upper((first_name)::text) ~~ '%ZZ%'::text) OR (upper((last_name)::text) ~~ '%ZZ%'::text) OR (upper((email)::text) ~~ '%ZZ%'::text) OR (upper((phone)::text) ~~ '%ZZ%'::text))
+        Rows Removed by Filter: 25000
+        Heap Blocks: exact=1484
+        Buffers: shared hit=1507
+        ->  Bitmap Index Scan on p_org  (cost=0.00..275.06 rows=24903 width=0) (actual time=0.694..0.695 rows=25000 loops=1)
+              Index Cond: (organization_id = 1)
+              Buffers: shared hit=23
+Planning Time: 0.213 ms
+Execution Time: 36.188 ms
+-- q='zz': page plan:
+Limit  (cost=0.42..12.70 rows=25 width=16) (actual time=51.702..51.704 rows=0 loops=1)
+  Buffers: shared hit=25105
+  ->  Index Scan using p_org_created_id on prospect  (cost=0.42..7223.81 rows=14703 width=16) (actual time=51.700..51.701 rows=0 loops=1)
+        Index Cond: (organization_id = 1)
+        Filter: ((upper((first_name)::text) ~~ '%ZZ%'::text) OR (upper((last_name)::text) ~~ '%ZZ%'::text) OR (upper((email)::text) ~~ '%ZZ%'::text) OR (upper((phone)::text) ~~ '%ZZ%'::text))
+        Rows Removed by Filter: 25000
+        Buffers: shared hit=25105
+Planning Time: 0.177 ms
+Execution Time: 51.729 ms
+
+===== With pg_trgm GIN indexes on UPPER(col) =====
+
+-- q='smith': 459 matches; COUNT plan:
+Aggregate  (cost=1715.98..1715.99 rows=1 width=8) (actual time=1.500..1.502 rows=1 loops=1)
+  Buffers: shared hit=450
+  ->  Bitmap Heap Scan on prospect  (cost=430.47..1714.19 rows=717 width=0) (actual time=1.065..1.475 rows=459 loops=1)
+        Recheck Cond: (((upper((first_name)::text) ~~ '%SMITH%'::text) OR (upper((last_name)::text) ~~ '%SMITH%'::text) OR (upper((email)::text) ~~ '%SMITH%'::text) OR (upper((phone)::text) ~~ '%SMITH%'::text)) AND (organization_id = 1))
+        Heap Blocks: exact=389
+        Buffers: shared hit=450
+        ->  BitmapAnd  (cost=430.47..430.47 rows=722 width=0) (actual time=1.019..1.021 rows=0 loops=1)
+              Buffers: shared hit=61
+              ->  BitmapOr  (cost=148.47..148.47 rows=2859 width=0) (actual time=0.500..0.501 rows=0 loops=1)
+                    Buffers: shared hit=37
+                    ->  Bitmap Index Scan on p_first_trgm  (cost=0.00..30.18 rows=4 width=0) (actual time=0.028..0.028 rows=0 loops=1)
+                          Index Cond: (upper((first_name)::text) ~~ '%SMITH%'::text)
+                          Buffers: shared hit=7
+                    ->  Bitmap Index Scan on p_last_trgm  (cost=0.00..39.35 rows=1835 width=0) (actual time=0.246..0.246 rows=1813 loops=1)
+                          Index Cond: (upper((last_name)::text) ~~ '%SMITH%'::text)
+                          Buffers: shared hit=10
+                    ->  Bitmap Index Scan on p_email_trgm  (cost=0.00..48.00 rows=1010 width=0) (actual time=0.220..0.220 rows=1813 loops=1)
+                          Index Cond: (upper((email)::text) ~~ '%SMITH%'::text)
+                          Buffers: shared hit=13
+                    ->  Bitmap Index Scan on p_phone_trgm  (cost=0.00..30.22 rows=10 width=0) (actual time=0.005..0.005 rows=0 loops=1)
+                          Index Cond: (upper((phone)::text) ~~ '%SMITH%'::text)
+                          Buffers: shared hit=7
+              ->  Bitmap Index Scan on p_org  (cost=0.00..281.57 rows=25237 width=0) (actual time=0.470..0.470 rows=25000 loops=1)
+                    Index Cond: (organization_id = 1)
+                    Buffers: shared hit=24
+Planning:
+  Buffers: shared hit=4
+Planning Time: 0.134 ms
+Execution Time: 1.526 ms
+-- q='smith': page plan:
+Limit  (cost=0.42..260.99 rows=25 width=16) (actual time=0.073..1.347 rows=25 loops=1)
+  Buffers: shared hit=1128
+  ->  Index Scan using p_org_created_id on prospect  (cost=0.42..7473.52 rows=717 width=16) (actual time=0.072..1.344 rows=25 loops=1)
+        Index Cond: (organization_id = 1)
+        Filter: ((upper((first_name)::text) ~~ '%SMITH%'::text) OR (upper((last_name)::text) ~~ '%SMITH%'::text) OR (upper((email)::text) ~~ '%SMITH%'::text) OR (upper((phone)::text) ~~ '%SMITH%'::text))
+        Rows Removed by Filter: 1095
+        Buffers: shared hit=1128
+Planning:
+  Buffers: shared hit=4
+Planning Time: 0.132 ms
+Execution Time: 1.359 ms
+
+-- q='john': 904 matches; COUNT plan:
+Aggregate  (cost=1986.33..1986.34 rows=1 width=8) (actual time=2.753..2.755 rows=1 loops=1)
+  Buffers: shared hit=1384
+  ->  Bitmap Heap Scan on prospect  (cost=145.87..1980.80 rows=2215 width=0) (actual time=0.806..2.702 rows=904 loops=1)
+        Recheck Cond: ((upper((first_name)::text) ~~ '%JOHN%'::text) OR (upper((last_name)::text) ~~ '%JOHN%'::text) OR (upper((email)::text) ~~ '%JOHN%'::text) OR (upper((phone)::text) ~~ '%JOHN%'::text))
+        Filter: (organization_id = 1)
+        Rows Removed by Filter: 2744
+        Heap Blocks: exact=1356
+        Buffers: shared hit=1384
+        ->  BitmapOr  (cost=145.87..145.87 rows=9013 width=0) (actual time=0.628..0.630 rows=0 loops=1)
+              Buffers: shared hit=28
+              ->  Bitmap Index Scan on p_first_trgm  (cost=0.00..31.00 rows=1904 width=0) (actual time=0.210..0.210 rows=1943 loops=1)
+                    Index Cond: (upper((first_name)::text) ~~ '%JOHN%'::text)
+                    Buffers: shared hit=7
+              ->  Bitmap Index Scan on p_last_trgm  (cost=0.00..31.73 rows=2048 width=0) (actual time=0.152..0.152 rows=1737 loops=1)
+                    Index Cond: (upper((last_name)::text) ~~ '%JOHN%'::text)
+                    Buffers: shared hit=7
+              ->  Bitmap Index Scan on p_email_trgm  (cost=0.00..59.39 rows=5051 width=0) (actual time=0.264..0.264 rows=3648 loops=1)
+                    Index Cond: (upper((email)::text) ~~ '%JOHN%'::text)
+                    Buffers: shared hit=9
+              ->  Bitmap Index Scan on p_phone_trgm  (cost=0.00..21.54 rows=10 width=0) (actual time=0.003..0.003 rows=0 loops=1)
+                    Index Cond: (upper((phone)::text) ~~ '%JOHN%'::text)
+                    Buffers: shared hit=5
+Planning:
+  Buffers: shared hit=4
+Planning Time: 0.092 ms
+Execution Time: 2.777 ms
+-- q='john': page plan:
+Limit  (cost=0.42..84.76 rows=25 width=16) (actual time=0.014..0.480 rows=25 loops=1)
+  Buffers: shared hit=375
+  ->  Index Scan using p_org_created_id on prospect  (cost=0.42..7473.52 rows=2215 width=16) (actual time=0.014..0.477 rows=25 loops=1)
+        Index Cond: (organization_id = 1)
+        Filter: ((upper((first_name)::text) ~~ '%JOHN%'::text) OR (upper((last_name)::text) ~~ '%JOHN%'::text) OR (upper((email)::text) ~~ '%JOHN%'::text) OR (upper((phone)::text) ~~ '%JOHN%'::text))
+        Rows Removed by Filter: 346
+        Buffers: shared hit=375
+Planning:
+  Buffers: shared hit=4
+Planning Time: 0.135 ms
+Execution Time: 0.491 ms
+
+-- q='example.com': 25000 matches; COUNT plan:
+Aggregate  (cost=2713.17..2713.18 rows=1 width=8) (actual time=22.082..22.083 rows=1 loops=1)
+  Buffers: shared hit=1508
+  ->  Bitmap Heap Scan on prospect  (cost=287.88..2650.08 rows=25234 width=0) (actual time=0.607..20.839 rows=25000 loops=1)
+        Recheck Cond: (organization_id = 1)
+        Filter: ((upper((first_name)::text) ~~ '%EXAMPLE.COM%'::text) OR (upper((last_name)::text) ~~ '%EXAMPLE.COM%'::text) OR (upper((email)::text) ~~ '%EXAMPLE.COM%'::text) OR (upper((phone)::text) ~~ '%EXAMPLE.COM%'::text))
+        Heap Blocks: exact=1484
+        Buffers: shared hit=1508
+        ->  Bitmap Index Scan on p_org  (cost=0.00..281.57 rows=25237 width=0) (actual time=0.449..0.449 rows=25000 loops=1)
+              Index Cond: (organization_id = 1)
+              Buffers: shared hit=24
+Planning:
+  Buffers: shared hit=4
+Planning Time: 0.101 ms
+Execution Time: 22.101 ms
+-- q='example.com': page plan:
+Limit  (cost=0.42..7.82 rows=25 width=16) (actual time=0.042..0.079 rows=25 loops=1)
+  Buffers: shared hit=28
+  ->  Index Scan using p_org_created_id on prospect  (cost=0.42..7473.52 rows=25234 width=16) (actual time=0.042..0.076 rows=25 loops=1)
+        Index Cond: (organization_id = 1)
+        Filter: ((upper((first_name)::text) ~~ '%EXAMPLE.COM%'::text) OR (upper((last_name)::text) ~~ '%EXAMPLE.COM%'::text) OR (upper((email)::text) ~~ '%EXAMPLE.COM%'::text) OR (upper((phone)::text) ~~ '%EXAMPLE.COM%'::text))
+        Buffers: shared hit=28
+Planning:
+  Buffers: shared hit=4
+Planning Time: 0.201 ms
+Execution Time: 0.093 ms
+
+-- q='201555': 0 matches; COUNT plan:
+Aggregate  (cost=277.62..277.63 rows=1 width=8) (actual time=0.092..0.093 rows=1 loops=1)
+  Buffers: shared hit=41
+  ->  Bitmap Heap Scan on prospect  (cost=172.59..277.60 rows=7 width=0) (actual time=0.091..0.091 rows=0 loops=1)
+        Recheck Cond: ((upper((first_name)::text) ~~ '%201555%'::text) OR (upper((last_name)::text) ~~ '%201555%'::text) OR (upper((email)::text) ~~ '%201555%'::text) OR (upper((phone)::text) ~~ '%201555%'::text))
+        Filter: (organization_id = 1)
+        Buffers: shared hit=41
+        ->  BitmapOr  (cost=172.59..172.59 rows=29 width=0) (actual time=0.090..0.091 rows=0 loops=1)
+              Buffers: shared hit=41
+              ->  Bitmap Index Scan on p_first_trgm  (cost=0.00..38.85 rows=4 width=0) (actual time=0.004..0.004 rows=0 loops=1)
+                    Index Cond: (upper((first_name)::text) ~~ '%201555%'::text)
+                    Buffers: shared hit=9
+              ->  Bitmap Index Scan on p_last_trgm  (cost=0.00..38.88 rows=5 width=0) (actual time=0.002..0.002 rows=0 loops=1)
+                    Index Cond: (upper((last_name)::text) ~~ '%201555%'::text)
+                    Buffers: shared hit=9
+              ->  Bitmap Index Scan on p_email_trgm  (cost=0.00..55.95 rows=10 width=0) (actual time=0.012..0.012 rows=0 loops=1)
+                    Index Cond: (upper((email)::text) ~~ '%201555%'::text)
+                    Buffers: shared hit=13
+              ->  Bitmap Index Scan on p_phone_trgm  (cost=0.00..38.90 rows=10 width=0) (actual time=0.073..0.073 rows=0 loops=1)
+                    Index Cond: (upper((phone)::text) ~~ '%201555%'::text)
+                    Buffers: shared hit=10
+Planning:
+  Buffers: shared hit=4
+Planning Time: 0.084 ms
+Execution Time: 0.105 ms
+-- q='201555': page plan:
+Limit  (cost=277.70..277.72 rows=7 width=16) (actual time=0.092..0.093 rows=0 loops=1)
+  Buffers: shared hit=41
+  ->  Sort  (cost=277.70..277.72 rows=7 width=16) (actual time=0.092..0.092 rows=0 loops=1)
+        Sort Key: created_at DESC, id DESC
+        Sort Method: quicksort  Memory: 25kB
+        Buffers: shared hit=41
+        ->  Bitmap Heap Scan on prospect  (cost=172.59..277.60 rows=7 width=16) (actual time=0.090..0.091 rows=0 loops=1)
+              Recheck Cond: ((upper((first_name)::text) ~~ '%201555%'::text) OR (upper((last_name)::text) ~~ '%201555%'::text) OR (upper((email)::text) ~~ '%201555%'::text) OR (upper((phone)::text) ~~ '%201555%'::text))
+              Filter: (organization_id = 1)
+              Buffers: shared hit=41
+              ->  BitmapOr  (cost=172.59..172.59 rows=29 width=0) (actual time=0.090..0.091 rows=0 loops=1)
+                    Buffers: shared hit=41
+                    ->  Bitmap Index Scan on p_first_trgm  (cost=0.00..38.85 rows=4 width=0) (actual time=0.004..0.004 rows=0 loops=1)
+                          Index Cond: (upper((first_name)::text) ~~ '%201555%'::text)
+                          Buffers: shared hit=9
+                    ->  Bitmap Index Scan on p_last_trgm  (cost=0.00..38.88 rows=5 width=0) (actual time=0.002..0.002 rows=0 loops=1)
+                          Index Cond: (upper((last_name)::text) ~~ '%201555%'::text)
+                          Buffers: shared hit=9
+                    ->  Bitmap Index Scan on p_email_trgm  (cost=0.00..55.95 rows=10 width=0) (actual time=0.011..0.011 rows=0 loops=1)
+                          Index Cond: (upper((email)::text) ~~ '%201555%'::text)
+                          Buffers: shared hit=13
+                    ->  Bitmap Index Scan on p_phone_trgm  (cost=0.00..38.90 rows=10 width=0) (actual time=0.073..0.073 rows=0 loops=1)
+                          Index Cond: (upper((phone)::text) ~~ '%201555%'::text)
+                          Buffers: shared hit=10
+Planning:
+  Buffers: shared hit=4
+Planning Time: 0.084 ms
+Execution Time: 0.102 ms
+
+-- q='zz': 0 matches; COUNT plan:
+Aggregate  (cost=2643.79..2643.80 rows=1 width=8) (actual time=24.525..24.526 rows=1 loops=1)
+  Buffers: shared hit=1508
+  ->  Bitmap Heap Scan on prospect  (cost=281.57..2643.77 rows=7 width=0) (actual time=24.520..24.521 rows=0 loops=1)
+        Recheck Cond: (organization_id = 1)
+        Filter: ((upper((first_name)::text) ~~ '%ZZ%'::text) OR (upper((last_name)::text) ~~ '%ZZ%'::text) OR (upper((email)::text) ~~ '%ZZ%'::text) OR (upper((phone)::text) ~~ '%ZZ%'::text))
+        Rows Removed by Filter: 25000
+        Heap Blocks: exact=1484
+        Buffers: shared hit=1508
+        ->  Bitmap Index Scan on p_org  (cost=0.00..281.57 rows=25237 width=0) (actual time=0.419..0.420 rows=25000 loops=1)
+              Index Cond: (organization_id = 1)
+              Buffers: shared hit=24
+Planning:
+  Buffers: shared hit=4
+Planning Time: 0.206 ms
+Execution Time: 24.553 ms
+-- q='zz': page plan:
+Limit  (cost=2643.87..2643.89 rows=7 width=16) (actual time=23.421..23.422 rows=0 loops=1)
+  Buffers: shared hit=1508
+  ->  Sort  (cost=2643.87..2643.89 rows=7 width=16) (actual time=23.419..23.420 rows=0 loops=1)
+        Sort Key: created_at DESC, id DESC
+        Sort Method: quicksort  Memory: 25kB
+        Buffers: shared hit=1508
+        ->  Bitmap Heap Scan on prospect  (cost=281.57..2643.77 rows=7 width=16) (actual time=23.414..23.415 rows=0 loops=1)
+              Recheck Cond: (organization_id = 1)
+              Filter: ((upper((first_name)::text) ~~ '%ZZ%'::text) OR (upper((last_name)::text) ~~ '%ZZ%'::text) OR (upper((email)::text) ~~ '%ZZ%'::text) OR (upper((phone)::text) ~~ '%ZZ%'::text))
+              Rows Removed by Filter: 25000
+              Heap Blocks: exact=1484
+              Buffers: shared hit=1508
+              ->  Bitmap Index Scan on p_org  (cost=0.00..281.57 rows=25237 width=0) (actual time=0.507..0.508 rows=25000 loops=1)
+                    Index Cond: (organization_id = 1)
+                    Buffers: shared hit=24
+Planning:
+  Buffers: shared hit=4
+Planning Time: 0.237 ms
+Execution Time: 23.446 ms

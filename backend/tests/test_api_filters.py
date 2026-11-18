@@ -2,6 +2,7 @@ from datetime import timedelta
 from decimal import Decimal
 
 import pytest
+from django.db import connection
 from django.utils import timezone
 
 from apps.crm.models import Prospect, Tour
@@ -151,3 +152,16 @@ def test_conversation_filters(manager_client, org):
     ConversationFactory(prospect=ProspectFactory(organization=org))
     assert ids(manager_client.get("/api/conversations/?needs_handoff=true")) == {flagged.pk}
     assert ids(manager_client.get("/api/conversations/?channel=SMS")) == {flagged.pk}
+
+
+@pytest.mark.parametrize("column", ["first_name", "last_name", "email", "phone"])
+def test_prospect_search_can_use_trigram_index(org, column):
+    # icontains compiles to UPPER(col::text) LIKE UPPER(%s). If the index expression ever
+    # stops matching that, Postgres silently ignores the index and search scans every row.
+    # With sequential scans off, the planner must pick the trigram index if it can use it.
+    ProspectFactory(organization=org)
+    qs = Prospect.objects.filter(**{f"{column}__icontains": "smith"})
+    with connection.cursor() as cursor:
+        cursor.execute("SET LOCAL enable_seqscan = off")
+        plan = qs.explain()
+    assert f"prospect_{column}_trgm" in plan
