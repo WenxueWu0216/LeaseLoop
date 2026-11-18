@@ -223,7 +223,7 @@ request wait in the queue.
 
 ### Not done yet, and when it would be worth it
 
-- **Search:** a `pg_trgm` GIN index over the searched columns would turn the 27 ms filtered
+- **Search:** done in [section 7](#7-prospect-search-with-trigram-indexes-november-2026). A `pg_trgm` GIN index over the searched columns would turn the 27 ms filtered
   scan into an index lookup. Search is the slowest endpoint (p95 93 ms at 100 users), so it
   is the first thing to change if load or data grows.
 - **Deep pages:** addressed in section 5 by paging over ids first and adding an index that
@@ -348,3 +348,56 @@ request; it just never rejected one.
 No endpoint's p95 moved by more than 2 ms. The 3 ms p99 difference is within the spread
 seen between repeated runs of the same build, so the overhead isn't measurable at this load.
 The load test is read-only, so it doesn't include the audit insert on writes.
+
+## 7. Prospect search with trigram indexes (November 2026)
+
+Search (`?q=`) was the slowest endpoint in sections 4 and 5. Its COUNT read every one of the
+org's 25,000 rows, because `icontains` on four columns can't use a B-tree index (section 3).
+This change adds a `pg_trgm` GIN index on each searched column.
+
+**The detail that matters.** Django compiles `first_name__icontains="smith"` to
+`UPPER("first_name"::text) LIKE UPPER('%smith%')`. A trigram index on the bare column would
+not match that expression, and Postgres would silently ignore it. So each index is built on
+`UPPER(column)` ([`apps/crm/models.py`](../backend/apps/crm/models.py), migration `0005`).
+`test_prospect_search_can_use_trigram_index` fails if the index stops matching the query.
+
+**How it was measured.** This run did not use the full app or a load test. The cloud machine
+it ran on had PostgreSQL 16.15 but not pgvector, which the app's migrations need.
+[`scripts/perf/search_bench.py`](../scripts/perf/search_bench.py) builds a table with the same
+searched columns and list indexes as `crm_prospect`, and seeds 100,000 rows over 4 orgs the way
+`seed_demo` does. It then runs `EXPLAIN ANALYZE` on the exact SQL Django generates for one
+org's search, before and after adding the indexes. Each number is the median of 15 runs after
+3 warm-ups; the table shows the median of 5 separate script runs. Machine: 4 vCPU, default
+Postgres config. Raw plans: [`perf/explain_search_trgm.txt`](perf/explain_search_trgm.txt).
+
+| Search term | Matches in org | COUNT before | COUNT after | Page before | Page after |
+|---|---:|---:|---:|---:|---:|
+| `smith` | 459 | 23.6 ms | **1.9 ms** | 1.3 ms | 1.4 ms |
+| `john` | 904 | 22.8 ms | **3.1 ms** | 0.4 ms | 0.4 ms |
+| `201555` (no match) | 0 | 23.5 ms | **0.12 ms** | 23.6 ms | **0.11 ms** |
+| `example.com` (every row) | 25,000 | 22.1 ms | 21.7 ms | 23.8 ms | 0.04 ms |
+| `zz` (2 characters) | 0 | 23 ms | 23 ms | 30 ms | 23 ms |
+
+What this shows:
+
+- **Typical names get a 10x faster COUNT** (about 23 ms to 2–3 ms). The COUNT was the main cost
+  of a search request; the page query was already fast for common names, because walking the
+  `(organization, -created_at, -id)` index finds 25 matches quickly.
+- **Searches with few or no matches get much faster on both queries.** Before, finding "no
+  results" meant scanning all 25,000 rows twice.
+- **Two cases don't improve.** A term that matches nearly every row (the shared email domain)
+  still counts every row. A term under 3 characters has no trigrams, so the indexes can't help.
+- **Cost:** the four indexes take 19 MB for 100,000 rows, and inserting 1,000 prospects took
+  31 ms instead of 19 ms (about 12 µs more per row). Prospects are written far less often than
+  they are read, so this is a good trade.
+
+Run-to-run spread was large on this shared machine: individual "before" COUNT medians ranged
+from 22 to 36 ms. The direction and size of the change were the same in all 5 runs.
+
+**Not measured yet:** the 100-user load test from section 5 against the full app. To run it,
+use the [Reproduce](#reproduce) steps on a machine with Docker, after `migrate`.
+
+```bash
+BENCH_DSN="dbname=bench user=bench password=bench host=localhost" \
+  python scripts/perf/search_bench.py /tmp/plans.txt
+```
